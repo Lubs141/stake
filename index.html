@@ -422,6 +422,7 @@
     <span class="row-label">Initial Stake</span>
     <input type="text" id="initial_stake" inputmode="numeric" pattern="[0-9]*" placeholder="5000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
   </div>
+  <div id="balance_mismatch_alert" style="display:none;margin:0 16px 8px;padding:7px 12px;border-radius:8px;background:#ff4d6a18;border:1px solid var(--danger);color:var(--danger);font-size:11px;font-weight:600;line-height:1.5;"></div>
   <div class="row">
     <span class="row-label">Chances / Session</span>
     <select id="chances_per_session" onchange="saveAndUpdate()">
@@ -433,9 +434,27 @@
     </select>
   </div>
   <div class="row">
+    <span class="row-label">Stake Rounding</span>
+    <select id="stake_rounding" onchange="saveAndUpdate()" style="font-size:12px;">
+      <option value="1">Exact — e.g. 23,747</option>
+      <option value="10">Nearest 10 — e.g. 23,750</option>
+      <option value="50">Nearest 50 — e.g. 23,750</option>
+      <option value="100">Nearest 100 — e.g. 23,700</option>
+      <option value="500">Nearest 500 — e.g. 23,500</option>
+      <option value="1000">Nearest 1,000 — e.g. 24,000</option>
+      <option value="5000">Nearest 5,000 — e.g. 25,000</option>
+      <option value="10000">Nearest 10,000 — e.g. 20,000</option>
+    </select>
+  </div>
+  <div class="row">
     <span class="row-label">Target Profit</span>
     <input type="text" id="target" inputmode="numeric" pattern="[0-9]*" placeholder="20000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
   </div>
+  <div class="row">
+    <span class="row-label">Stop Loss <span style="font-size:9px;color:var(--muted-text);font-weight:400;">(max loss)</span></span>
+    <input type="text" id="stop_loss" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 50000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div id="stop_loss_alert" style="display:none;margin:0 16px 8px;padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;line-height:1.5;"></div>
 
 </div>
 
@@ -651,6 +670,8 @@ let state = {
   initial_stake: '',
   chances_per_session: '',
   target: '',
+  stop_loss: '',
+  stake_rounding: 1,
   current_session: 1,
   current_chance: 1,
   session_losses: 0,
@@ -677,13 +698,164 @@ function saveState() {
 
 function save() { saveState(); }
 
+// Track which field is currently error-locked
+let _errorLockedField = null;
+
+function lockFieldOnError(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+  _errorLockedField = fieldId;
+  el.removeAttribute('readonly');
+  el.style.borderColor = 'var(--danger)';
+  el.style.boxShadow = '0 0 0 2px rgba(255,77,106,0.3)';
+  // Refocus after short delay to ensure DOM settled
+  setTimeout(() => { el.focus(); }, 50);
+  // Override onblur to re-lock unless error is gone
+  el.onblur = function() {
+    setTimeout(() => {
+      const stillError = document.getElementById(fieldId === 'initial_stake' || fieldId === 'bankroll'
+        ? 'balance_mismatch_alert' : 'stop_loss_alert');
+      if (stillError && stillError.style.display !== 'none' && _errorLockedField === fieldId) {
+        el.focus();
+      } else {
+        unlockFieldError(fieldId);
+      }
+    }, 100);
+  };
+}
+
+function unlockFieldError(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+  if (_errorLockedField === fieldId) _errorLockedField = null;
+  el.style.borderColor = '';
+  el.style.boxShadow = '';
+  el.onblur = function() {
+    this.setAttribute('readonly', '');
+    this.blur();
+  };
+}
+
+function clearAllFieldErrors() {
+  ['bankroll','initial_stake','target','stop_loss'].forEach(id => unlockFieldError(id));
+}
+
+function checkBalanceMismatch() {
+  const bankroll = parseFloat(state.bankroll) || 0;
+  const initStake = parseFloat(state.initial_stake) || 0;
+  const mismatchEl = document.getElementById('balance_mismatch_alert');
+  if (!mismatchEl) return;
+  if (bankroll > 0 && initStake > 0) {
+    const currentBal = bankroll + state.total_profit;
+    if (initStake > currentBal) {
+      mismatchEl.style.display = 'block';
+      mismatchEl.style.borderColor = 'var(--danger)';
+      mismatchEl.style.background = '#ff4d6a18';
+      mismatchEl.style.color = 'var(--danger)';
+      mismatchEl.textContent = '⚠️ Initial stake (' + initStake.toLocaleString() + ') exceeds current balance (' + Math.round(currentBal).toLocaleString() + ') — bet will be blocked.';
+      lockFieldOnError('initial_stake');
+    } else if (initStake > currentBal * 0.5 && currentBal > 0) {
+      mismatchEl.style.display = 'block';
+      mismatchEl.style.borderColor = 'var(--warn)';
+      mismatchEl.style.background = 'rgba(245,158,11,0.1)';
+      mismatchEl.style.color = 'var(--warn)';
+      mismatchEl.textContent = '⚠️ Initial stake is more than 50% of bankroll — high risk.';
+      // High risk is a warning only — don't lock, just highlight
+      const el = document.getElementById('initial_stake');
+      if (el) { el.style.borderColor = 'var(--warn)'; el.style.boxShadow = '0 0 0 2px rgba(245,158,11,0.25)'; }
+      unlockFieldError('initial_stake');
+    } else {
+      mismatchEl.style.display = 'none';
+      unlockFieldError('initial_stake');
+    }
+  } else {
+    mismatchEl.style.display = 'none';
+    unlockFieldError('initial_stake');
+  }
+}
+
+function checkStopLoss() {
+  const sl = parseFloat(state.stop_loss) || 0;
+  const bankroll = parseFloat(state.bankroll) || 0;
+  const target = parseFloat(state.target) || 0;
+  const initStake = parseFloat(state.initial_stake) || 0;
+  const slEl = document.getElementById('stop_loss_alert');
+  if (!slEl) return;
+
+  if (!sl) { slEl.style.display = 'none'; return; }
+
+  const currentBal = bankroll ? bankroll + state.total_profit : 0;
+  const totalLoss = -state.total_profit; // positive = in the red
+
+  // Alert conditions
+  if (bankroll > 0 && sl >= bankroll) {
+    slEl.style.display = 'block';
+    slEl.style.background = '#ff4d6a18';
+    slEl.style.border = '1px solid var(--danger)';
+    slEl.style.color = 'var(--danger)';
+    slEl.textContent = '⚠️ Stop loss (' + sl.toLocaleString() + ') equals or exceeds your full bankroll (' + bankroll.toLocaleString() + ') — adjust it.';
+    lockFieldOnError('stop_loss');
+    return;
+  }
+  if (target > 0 && sl >= target) {
+    slEl.style.display = 'block';
+    slEl.style.background = 'rgba(245,158,11,0.1)';
+    slEl.style.border = '1px solid var(--warn)';
+    slEl.style.color = 'var(--warn)';
+    slEl.textContent = '⚠️ Stop loss (' + sl.toLocaleString() + ') equals or exceeds your target (' + target.toLocaleString() + ') — this negates your target.';
+    lockFieldOnError('stop_loss');
+    return;
+  }
+  if (initStake > 0 && sl < initStake) {
+    slEl.style.display = 'block';
+    slEl.style.background = 'rgba(245,158,11,0.1)';
+    slEl.style.border = '1px solid var(--warn)';
+    slEl.style.color = 'var(--warn)';
+    slEl.textContent = '⚠️ Stop loss (' + sl.toLocaleString() + ') is less than your initial stake (' + initStake.toLocaleString() + ') — you may not complete a single bet.';
+    lockFieldOnError('stop_loss');
+    return;
+  }
+  // Active: check if stop loss has been hit (runtime — don't lock, just alert)
+  if (totalLoss >= sl) {
+    slEl.style.display = 'block';
+    slEl.style.background = '#ff4d6a33';
+    slEl.style.border = '2px solid var(--danger)';
+    slEl.style.color = 'var(--danger)';
+    slEl.textContent = '🛑 STOP LOSS HIT — Total loss of ' + totalLoss.toLocaleString() + ' has reached your limit of ' + sl.toLocaleString() + '. No further bets should be placed.';
+    unlockFieldError('stop_loss');
+    return;
+  }
+  unlockFieldError('stop_loss');
+  // Approaching: warn at 80%
+  if (totalLoss >= sl * 0.8) {
+    slEl.style.display = 'block';
+    slEl.style.background = 'rgba(245,158,11,0.1)';
+    slEl.style.border = '1px solid var(--warn)';
+    slEl.style.color = 'var(--warn)';
+    slEl.textContent = '⚠️ Approaching stop loss — current loss ' + totalLoss.toLocaleString() + ' is ' + Math.round((totalLoss/sl)*100) + '% of your limit (' + sl.toLocaleString() + ').';
+    return;
+  }
+  slEl.style.display = 'none';
+}
+
 function saveAndUpdate() {
   state.bankroll = document.getElementById('bankroll').value;
   state.initial_stake = document.getElementById('initial_stake').value;
   state.chances_per_session = document.getElementById('chances_per_session').value;
   state.target = document.getElementById('target').value;
+  state.stop_loss = document.getElementById('stop_loss').value;
+  state.stake_rounding = parseInt(document.getElementById('stake_rounding').value) || 1;
   saveState();
   renderStatus();
+  checkBalanceMismatch();
+  checkStopLoss();
+  checkStopLoss();
+}
+
+function roundStake(value) {
+  const unit = parseInt(state.stake_rounding) || 1;
+  if (unit <= 1) return Math.round(value);
+  return Math.round(value / unit) * unit;
 }
 
 function calcStake(initial, chance, lastLostStake, lastLostOdds, lastWonStake, lastWonOdds, mode) {
@@ -696,22 +868,22 @@ function calcStake(initial, chance, lastLostStake, lastLostOdds, lastWonStake, l
     // SLOTS mode: stake = (init × uncovered_slots) + recovery_value_of_previous_loss
     const uncovered = maxChances - chance + 1;
     const base = init * uncovered;
-    if (!lastLostStake || !lastLostOdds || lastLostOdds <= 1) return Math.round(base);
+    if (!lastLostStake || !lastLostOdds || lastLostOdds <= 1) return roundStake(base);
     const recoveryValue = (lastLostStake * lastLostOdds) / (lastLostOdds - 1);
-    return Math.round(base + recoveryValue);
+    return roundStake(base + recoveryValue);
   }
   if (activeMode === 'opposite') {
     // PAR mode: increase after wins, reset after losses
     if (!lastWonStake || !lastWonOdds || lastWonOdds <= 1) return init;
     const wonPotentialProfit = lastWonStake * (lastWonOdds - 1);
     const boostAmount = (lastWonStake + wonPotentialProfit) / (lastWonOdds - 1);
-    return Math.round(init + boostAmount);
+    return roundStake(init + boostAmount);
   }
   // MTG mode: increase after losses, reset after wins
   if (!lastLostStake || !lastLostOdds || lastLostOdds <= 1) return init;
   const lostPotentialProfit = lastLostStake * (lastLostOdds - 1);
   const recoveryAmount = (lastLostStake + lostPotentialProfit) / (lastLostOdds - 1);
-  return Math.round(init + recoveryAmount);
+  return roundStake(init + recoveryAmount);
 }
 
 function lockMode() {
@@ -1198,6 +1370,7 @@ function renderStatus() {
 
   document.getElementById('display_session').textContent = sess;
   document.getElementById('bet_count_badge').textContent = state.bet_history.length;
+  checkBalanceMismatch();
   if (state.bet_history.length > 0) lockMode(); else unlockMode();
   if (chartVisible) startChartAnimation();
   const _mode = state.mode || 'default';
@@ -1207,7 +1380,22 @@ function renderStatus() {
   document.getElementById('score_period_label').textContent = _mp === 'HT' ? 'Half Time' : 'Full Time';
   document.getElementById('display_chance').textContent = ch;
   document.getElementById('display_stake').textContent = stake ? stake.toLocaleString() : '—';
-  document.getElementById('display_bankroll').textContent = bankroll ? (bankroll + state.total_profit).toLocaleString() : '—';
+  const currentBal = bankroll + state.total_profit;
+  const balEl = document.getElementById('display_bankroll');
+  balEl.textContent = bankroll ? currentBal.toLocaleString() : '—';
+  // Colour-code bankroll: red if depleted, orange if below 20%, green if healthy
+  if (bankroll > 0) {
+    if (currentBal <= 0) {
+      balEl.style.color = 'var(--danger)';
+      balEl.title = '⚠️ Bankroll depleted!';
+    } else if (currentBal < bankroll * 0.2) {
+      balEl.style.color = 'var(--warn)';
+      balEl.title = '⚠️ Low balance: below 20% of original bankroll';
+    } else {
+      balEl.style.color = '';
+      balEl.title = '';
+    }
+  }
   const sl = state.session_losses || 0;
   document.getElementById('display_sess_loss').textContent = sl > 0 ? '-' + sl.toLocaleString() : '—';
 
@@ -1359,6 +1547,27 @@ function showConfirmBar(pred) {
 }
 
 function confirmPrediction() {
+  // Check stop loss before allowing confirm
+  const _sl = parseFloat(state.stop_loss) || 0;
+  if (_sl > 0 && -state.total_profit >= _sl) {
+    flashBanner('🛑 Stop loss of ' + _sl.toLocaleString() + ' hit — no further bets allowed.', 'loss');
+    return;
+  }
+  // Check balance before allowing confirm
+  const _bankroll = parseFloat(state.bankroll) || 0;
+  const _initStake = parseFloat(state.initial_stake) || 0;
+  if (_bankroll > 0 && _initStake > 0) {
+    const _currentBal = _bankroll + state.total_profit;
+    const _stake = calcStake(_initStake, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+    if (_currentBal <= 0) {
+      flashBanner('⚠️ Cannot confirm — bankroll is fully depleted (' + Math.round(_currentBal).toLocaleString() + ').', 'loss');
+      return;
+    }
+    if (_stake > _currentBal) {
+      flashBanner('⚠️ Cannot confirm — stake ' + _stake.toLocaleString() + ' exceeds balance ' + Math.round(_currentBal).toLocaleString() + '.', 'loss');
+      return;
+    }
+  }
   save();
   // Lock bet_id, odds, period and prediction
   document.getElementById('bet_id').disabled = true;
@@ -1464,10 +1673,36 @@ function submitBet() {
   if (home === '' || away === '') { flashBanner('Please enter the match score.', 'loss'); return; }
   if (!state.initial_stake) { flashBanner('Please set your initial stake first.', 'loss'); return; }
   if (!state.chances_per_session) { flashBanner('Please set chances per session first.', 'loss'); return; }
+  const _slCheck = parseFloat(state.stop_loss) || 0;
+  if (_slCheck > 0 && -state.total_profit >= _slCheck) {
+    flashBanner('🛑 Stop loss of ' + _slCheck.toLocaleString() + ' hit — no further bets allowed.', 'loss');
+    return;
+  }
 
   const init = parseFloat(state.initial_stake);
   const maxCh = parseInt(state.chances_per_session);
   const stake = calcStake(init, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+
+  // ── Balance check ──
+  const bankrollSet = parseFloat(state.bankroll) || 0;
+  if (bankrollSet > 0) {
+    const currentBalance = bankrollSet + state.total_profit;
+    if (currentBalance <= 0) {
+      flashBanner('⚠️ Insufficient balance — bankroll is depleted ('+Math.round(currentBalance).toLocaleString()+').', 'loss');
+      return;
+    }
+    if (stake > currentBalance) {
+      flashBanner('⚠️ Insufficient balance — stake '+stake.toLocaleString()+' exceeds current bankroll '+Math.round(currentBalance).toLocaleString()+'.', 'loss');
+      return;
+    }
+    // Warn (but allow) if balance will drop below 20% of original after this stake
+    const afterStake = currentBalance - stake;
+    if (afterStake < bankrollSet * 0.2 && afterStake > 0) {
+      const proceed = confirm('⚠️ Low balance warning: placing this stake of '+stake.toLocaleString()+' will leave you with '+Math.round(afterStake).toLocaleString()+' ('+Math.round((afterStake/bankrollSet)*100)+'% of original bankroll). Proceed?');
+      if (!proceed) return;
+    }
+  }
+
   const won = getPredictionResult(pred, home, away);
   const isLastChance = state.current_chance >= maxCh;
 
@@ -1679,6 +1914,8 @@ function confirmReset() {
       target: '', current_session: 1, current_chance: 1,
       session_losses: 0, session_gross_wins: 0, sessions: [],
       total_profit: 0, target_hit: false,
+      stop_loss: state.stop_loss || '',
+      stake_rounding: state.stake_rounding || 1,
       last_lost_stake: 0, last_lost_odds: 0,
       last_won_stake: 0, last_won_odds: 0,
       mode: state.mode || 'default',
@@ -1686,7 +1923,7 @@ function confirmReset() {
       chance_outcomes: [],
       bet_history: []
     };
-    ['bankroll','initial_stake','target','bet_id','odds'].forEach(function(id) {
+    ['bankroll','initial_stake','target','stop_loss','bet_id','odds'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) { el.value = ''; el.setAttribute('readonly',''); }
     });
@@ -1699,6 +1936,11 @@ function confirmReset() {
     document.getElementById('result_banner').style.display = 'none';
     const _cn = document.getElementById('chart_target_notify');
     if (_cn) _cn.style.display = 'none';
+    const _bma = document.getElementById('balance_mismatch_alert');
+    if (_bma) _bma.style.display = 'none';
+    const _sla = document.getElementById('stop_loss_alert');
+    if (_sla) _sla.style.display = 'none';
+    clearAllFieldErrors();
     const _ns = document.getElementById('chart_next_stake');
     if (_ns) _ns.textContent = '—';
     const _bv = document.getElementById('chart_bankroll_val');
@@ -1713,6 +1955,8 @@ function populateInputs() {
   if (state.initial_stake) document.getElementById('initial_stake').value = state.initial_stake;
   if (state.chances_per_session) document.getElementById('chances_per_session').value = state.chances_per_session;
   if (state.target) document.getElementById('target').value = state.target;
+  if (state.stop_loss) document.getElementById('stop_loss').value = state.stop_loss;
+  if (state.stake_rounding) document.getElementById('stake_rounding').value = state.stake_rounding;
 }
 
 // Init
