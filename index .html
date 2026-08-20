@@ -1,0 +1,1979 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Martingale Strategy Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --surface2: #1e2230;
+    --border: #2a2f3d;
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --accent-glow: rgba(0,229,160,0.25);
+    --warn: #f5a623;
+    --warn-dim: rgba(245,166,35,0.12);
+    --danger: #ff4d6a;
+    --danger-dim: rgba(255,77,106,0.12);
+    --text: #eef0f6;
+    --muted: #7a82a0;
+    --label: #4a5270;
+    --mono: 'DM Mono', monospace;
+    --head: 'Syne', sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--head);
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* ── Header ── */
+  .sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .top-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo { font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .logo span { color: var(--muted); font-weight: 400; }
+
+  .btn-reset {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(255,77,106,0.3);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-family: var(--head);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { background: rgba(255,77,106,0.22); }
+
+  /* ── Sections ── */
+  .section {
+    margin: 20px 16px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .section-head {
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Row ── */
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row-label {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 120px;
+  }
+  .row-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: right;
+  }
+
+  /* ── Inputs ── */
+  input[type="number"], input[type="text"], select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 8px 12px;
+    width: 140px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a82a0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: calc(100% - 10px) center;
+    padding-right: 30px;
+  }
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="text"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  /* ── Auto display (read-only computed) ── */
+  .auto-val {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: 8px;
+    padding: 7px 14px;
+    min-width: 100px;
+    text-align: center;
+  }
+  .auto-val.stake { font-size: 20px; font-weight: 700; color: var(--warn); background: var(--warn-dim); border-color: rgba(245,166,35,0.25); }
+
+  /* ── Score row ── */
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+  }
+  .score-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 6px;
+  }
+  .score-select { width: 80px; text-align: center; font-size: 20px; font-weight: 700; }
+  .score-vs {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--label);
+    padding-top: 20px;
+  }
+
+  /* ── Submit button ── */
+  .btn-submit {
+    display: block;
+    width: calc(100% - 32px);
+    margin: 16px;
+    padding: 15px;
+    background: var(--accent);
+    color: #001a0f;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--head);
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-submit:hover { background: #00ffb3; }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; }
+
+  /* ── Result banner ── */
+  .result-banner {
+    margin: 0 16px;
+    padding: 13px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    display: none;
+    letter-spacing: 0.04em;
+  }
+  .result-banner.win { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,0.3); display: block; }
+  .result-banner.loss { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,77,106,0.3); display: block; }
+
+  /* ── Summary table ── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .summary-table thead tr {
+    background: var(--surface2);
+  }
+  .summary-table th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+  }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .profit-pos { color: var(--accent); }
+  .profit-neg { color: var(--danger); }
+  .profit-zero { color: var(--muted); }
+
+  .total-row {
+    background: var(--surface2);
+    font-weight: 700;
+  }
+  .total-row td {
+    border-top: 1px solid var(--border);
+    border-bottom: none !important;
+    color: var(--text);
+  }
+
+  /* ── Stats strip ── */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .stat-box {
+    background: var(--surface);
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .stat-lbl { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; margin-top: 2px; }
+
+  /* ── Target hit overlay ── */
+  .target-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 32px;
+  }
+  .target-overlay.show { display: flex; }
+  .target-emoji { font-size: 64px; margin-bottom: 16px; }
+  .target-title { font-size: 28px; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
+  .target-sub { font-size: 15px; color: var(--muted); margin-bottom: 28px; }
+  .btn-continue {
+    background: var(--accent);
+    color: #001a0f;
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px 32px;
+    font-family: var(--head);
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Progress bar ── */
+  .progress-wrap {
+    margin: 0 16px 4px;
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    max-width: 100%;
+  }
+  .progress-lbl {
+    margin: 0 16px 16px;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--label);
+    font-size: 13px;
+  }
+
+  /* ── Chance dots ── */
+  .chance-dots {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+  .dot.active { background: var(--warn); }
+  .dot.used { background: var(--muted); }
+  @keyframes chartNotifyBlink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes chartStakeBlink {
+    0%, 55% { opacity: 1; }
+    56%, 100% { opacity: 0.15; }
+  }
+  #chart_next_stake {
+    animation: chartStakeBlink 1.2s step-end infinite;
+  }
+  @keyframes chartNotifySlide {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  #chart_target_notify {
+    animation: chartNotifyBlink 0.9s step-end infinite, chartNotifySlide 2s linear infinite;
+  }
+
+  #bet_history_panel::-webkit-scrollbar { width: 4px; }
+  #bet_history_panel::-webkit-scrollbar-track { background: transparent; }
+  #bet_history_panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .dot.win { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+  .dot.loss { background: var(--danger); box-shadow: 0 0 6px rgba(255,77,106,0.4); }
+
+  .bankroll-display {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<div class="sticky-header">
+<div class="top-bar">
+  <div class="logo">Martingale <span>Tracker</span></div>
+  <button class="btn-reset" onclick="confirmReset()">↺ Reset All</button>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;background:var(--surface2);border-bottom:1px solid var(--border);">
+  <span style="font-size:11px;font-weight:600;color:var(--muted-text);letter-spacing:0.04em;white-space:nowrap;">MODE <span id="mode_lock_icon" style="display:none;">🔒</span></span>
+  <select id="mode_select" onchange="setMode(this.value)" style="font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--surface2);color:var(--text);cursor:pointer;width:120px;flex-shrink:0;text-align:center;text-align-last:center;">
+    <option value="default">Martingale</option>
+    <option value="opposite">Paroli</option>
+    <option value="slots">Slots</option>
+  </select>
+  <span id="mode_desc" style="font-size:11px;color:var(--muted-text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Martingale: Stake held after wins, increased after losses.</span>
+</div>
+</div>
+
+<!-- SETUP SECTION -->
+<div class="section" id="setup-section">
+  <div class="section-head">⚙ Configuration</div>
+
+  <div class="row">
+    <span class="row-label">Bankroll</span>
+    <input type="text" id="bankroll" inputmode="numeric" pattern="[0-9]*" placeholder="1300000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div class="row">
+    <span class="row-label">Initial Stake</span>
+    <input type="text" id="initial_stake" inputmode="numeric" pattern="[0-9]*" placeholder="5000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div id="balance_mismatch_alert" style="display:none;margin:0 16px 8px;padding:7px 12px;border-radius:8px;background:#ff4d6a18;border:1px solid var(--danger);color:var(--danger);font-size:11px;font-weight:600;line-height:1.5;"></div>
+  <div class="row">
+    <span class="row-label">Chances / Session</span>
+    <select id="chances_per_session" onchange="saveAndUpdate()">
+      <option value="">-- select --</option>
+      <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+      <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+      <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+      <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+    </select>
+  </div>
+  <div class="row">
+    <span class="row-label">Stake Rounding</span>
+    <select id="stake_rounding" onchange="saveAndUpdate()" style="font-size:12px;">
+      <option value="1">Exact — e.g. 23,747</option>
+      <option value="10">Nearest 10 — e.g. 23,750</option>
+      <option value="50">Nearest 50 — e.g. 23,750</option>
+      <option value="100">Nearest 100 — e.g. 23,700</option>
+      <option value="500">Nearest 500 — e.g. 23,500</option>
+      <option value="1000">Nearest 1,000 — e.g. 24,000</option>
+      <option value="5000">Nearest 5,000 — e.g. 25,000</option>
+      <option value="10000">Nearest 10,000 — e.g. 20,000</option>
+    </select>
+  </div>
+  <div class="row">
+    <span class="row-label">Target Profit</span>
+    <input type="text" id="target" inputmode="numeric" pattern="[0-9]*" placeholder="20000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div class="row">
+    <span class="row-label">Stop Loss <span style="font-size:9px;color:var(--muted-text);font-weight:400;">(max loss)</span></span>
+    <input type="text" id="stop_loss" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 50000" readonly onfocus="this.removeAttribute('readonly')" oninput="saveAndUpdate()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div id="stop_loss_alert" style="display:none;margin:0 16px 8px;padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;line-height:1.5;"></div>
+
+</div>
+
+<!-- STATUS SECTION -->
+<div class="section">
+  <div class="section-head">📊 Current Status</div>
+  <div class="row">
+    <span class="row-label">Bankroll</span>
+    <span class="bankroll-display" id="display_bankroll">—</span>
+  </div>
+  <div class="row">
+    <span class="row-label">Session</span>
+    <span class="auto-val" id="display_session">1</span>
+  </div>
+  <div class="row">
+    <span class="row-label">Chance</span>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px">
+      <span class="auto-val" id="display_chance">1</span>
+      <div class="chance-dots" id="chance_dots"></div>
+    </div>
+  </div>
+  <div class="row">
+    <span class="row-label">Session losses</span>
+    <span class="auto-val" id="display_sess_loss" style="color:var(--danger);background:var(--danger-dim);border-color:rgba(255,77,106,0.2)">—</span>
+  </div>
+  <div class="row">
+    <span class="row-label">Calculated Stake</span>
+    <span class="auto-val stake" id="display_stake">—</span>
+  </div>
+</div>
+
+<!-- Target progress -->
+<div style="margin-top:16px">
+
+  <!-- Chart toggle button -->
+  <div style="margin:0 16px 8px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted-text);letter-spacing:0.05em;">📈 PROFIT CHART</span>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button id="chart_anim_btn" onclick="toggleChartDraw()" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted-text);cursor:pointer;transition:all 0.2s;">▶ Draw</button>
+      <button id="chart_toggle_btn" onclick="toggleProfitChart()" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted-text);cursor:pointer;transition:all 0.2s;">Show</button>
+    </div>
+  </div>
+
+
+
+  <!-- Line chart canvas -->
+  <div id="profit_chart_wrap" style="display:none;margin:0 16px 12px;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface2);">
+    <div id="chart_target_notify" style="display:none;position:absolute;top:0;left:0;right:0;z-index:10;padding:6px 12px;text-align:center;font-size:12px;font-weight:700;letter-spacing:0.05em;background:linear-gradient(90deg,#00e5a0,#00b4d8,#00e5a0);background-size:200% 100%;color:#000;pointer-events:none;">🎯 TARGET REACHED!</div>
+
+    <!-- Stats bar inside container, above canvas -->
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:5px 10px 3px;">
+      <!-- Next Stake -->
+      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
+        <span style="font-size:9px;font-weight:700;color:var(--muted-text);letter-spacing:0.05em;text-transform:uppercase;">Next Stake</span>
+        <span id="chart_next_stake" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--warn);background:var(--surface);padding:2px 6px;border-radius:6px;border:1px solid var(--border);"></span>
+      </div>
+      <!-- Bankroll -->
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+        <span style="font-size:9px;font-weight:700;color:var(--muted-text);letter-spacing:0.05em;text-transform:uppercase;">Bankroll</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span id="chart_bankroll_val" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text);background:var(--surface);padding:2px 6px;border-radius:6px;border:1px solid var(--border);"></span>
+          <span id="chart_arrow" style="font-size:14px;line-height:1;">▲</span>
+        </div>
+      </div>
+    </div>
+    <canvas id="profit_chart" height="180" style="width:100%;display:block;"></canvas>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progress_bar" style="width:0%"></div>
+  </div>
+  <div class="progress-lbl">
+    <span>Profit progress</span>
+    <span id="progress_lbl">0 / 0</span>
+  </div>
+</div>
+
+<!-- BET ENTRY SECTION -->
+<div class="section">
+  <div class="section-head">🎯 Bet Details</div>
+  <div class="row">
+    <span class="row-label">Bet ID</span>
+    <input type="text" id="bet_id" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 123456" readonly onfocus="this.removeAttribute('readonly')" oninput="save()" onblur="this.setAttribute('readonly','');this.blur()" style="width:140px">
+  </div>
+  <div class="row">
+    <span class="row-label">Chance Odds</span>
+    <input type="text" id="odds" inputmode="decimal" pattern="[0-9.]*" placeholder="1.80" readonly onfocus="this.removeAttribute('readonly')" oninput="save()" onblur="this.setAttribute('readonly','');this.blur()">
+  </div>
+  <div class="row">
+    <span class="row-label">Match Period</span>
+    <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;width:fit-content;">
+      <button id="btn_ft" onclick="setMatchPeriod('FT')" style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#000;transition:all 0.15s;">Full Time</button>
+      <button id="btn_ht" onclick="setMatchPeriod('HT')" style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--muted-text);transition:all 0.15s;">Half Time</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="row-label">Prediction</span>
+    <select id="prediction" onchange="onPredictionChange();">
+      <option value="">-- select --</option>
+      <option value="Home Win">Home Win</option>
+      <option value="Draw">Draw</option>
+      <option value="Away Win">Away Win</option>
+      <option value="Both Score - Yes">Both Score - Yes</option>
+      <option value="Both Score - No">Both Score - No</option>
+      <option value="Over 1.5">Over 1.5</option>
+      <option value="Under 1.5">Under 1.5</option>
+      <option value="Over 2.5">Over 2.5</option>
+      <option value="Under 2.5">Under 2.5</option>
+      <option value="Over 3.5">Over 3.5</option>
+      <option value="Under 3.5">Under 3.5</option>
+      <option value="Either Team Over 2.5">Either Team to Score Over 2.5</option>
+      <option value="Correct Score">Correct Score</option>
+    </select>
+  </div>
+  <div id="cs_picker_row" class="row" style="display:none;">
+    <span class="row-label">Score</span>
+    <select id="cs_score" onchange="onCSScoreChange();" style="width:140px;">
+      <option value="">-- pick score --</option>
+      <option value="CS 1-0">1 - 0</option>
+      <option value="CS 2-0">2 - 0</option>
+      <option value="CS 2-1">2 - 1</option>
+      <option value="CS 0-0">0 - 0</option>
+      <option value="CS 1-1">1 - 1</option>
+      <option value="CS 2-2">2 - 2</option>
+      <option value="CS 0-1">0 - 1</option>
+      <option value="CS 0-2">0 - 2</option>
+      <option value="CS 1-2">1 - 2</option>
+    </select>
+  </div>
+  <div id="pred_confirm_bar" style="display:none; margin:6px 0 2px; padding:10px 12px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--text);flex:1;">
+      <span>Bet ID: <strong id="betid_confirm_label" style="color:var(--accent);"></strong></span>
+      <span>Odds: <strong id="odds_confirm_label" style="color:var(--accent);"></strong></span>
+      <span>Period: <strong id="period_confirm_label" style="color:var(--accent);"></strong></span>
+      <span>Prediction: <strong id="pred_confirm_label" style="color:var(--accent);"></strong></span>
+      <span>Stake: <strong id="stake_confirm_label" style="color:var(--warn);"></strong></span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="confirmPrediction()" style="padding:5px 14px;border-radius:6px;border:none;background:var(--accent);color:#000;font-weight:700;font-size:12px;cursor:pointer;">Confirm All</button>
+      <button onclick="changePrediction()" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;cursor:pointer;">Change</button>
+    </div>
+  </div>
+
+  <div class="section-head" style="border-top:1px solid var(--border)">⚽ Match Score — <span id="score_period_label" style="font-weight:400;font-size:11px;color:var(--muted-text);">Full Time</span></div>
+  <div class="score-row">
+    <div>
+      <div class="score-label">Home</div>
+      <select id="score_home" class="score-select" onchange="save()" disabled style="opacity:0.4;pointer-events:none;">
+        <option value="">-</option>
+        <option>0</option><option>1</option><option>2</option>
+        <option>3</option><option>4</option><option>5</option>
+      </select>
+    </div>
+    <div class="score-vs">VS</div>
+    <div>
+      <div class="score-label">Away</div>
+      <select id="score_away" class="score-select" onchange="save()" disabled style="opacity:0.4;pointer-events:none;">
+        <option value="">-</option>
+        <option>0</option><option>1</option><option>2</option>
+        <option>3</option><option>4</option><option>5</option>
+      </select>
+    </div>
+  </div>
+  <div class="result-banner" id="result_banner"></div>
+  <button class="btn-submit" id="submit_btn" onclick="submitBet()" style="margin-top:14px;">Record Result</button>
+
+  <!-- BET HISTORY TOGGLE -->
+  <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:12px;">
+    <div onclick="toggleBetHistory()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+      <span style="font-size:13px;font-weight:600;color:var(--text-secondary);letter-spacing:0.04em;">📜 BET HISTORY <span id="bet_count_badge" style="font-size:11px;font-weight:500;background:var(--border);color:var(--muted-text);border-radius:10px;padding:1px 7px;margin-left:5px;">0</span></span>
+      <span id="bet_history_arrow" style="font-size:11px;color:var(--muted-text);transition:transform 0.2s;">▼</span>
+    </div>
+    <div id="bet_history_panel" style="display:none; margin-top:10px; max-height:240px; overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:8px; padding:0 8px;">
+      <div id="bet_history_body">
+        <div class="empty-state" style="padding:12px 0;">No bets recorded yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SUMMARY SECTION -->
+<div class="section">
+  <div class="section-head">📋 Session Summary</div>
+  <div id="summary_body">
+    <div class="empty-state">No completed sessions yet. Good luck! 🍀</div>
+  </div>
+  <div class="stats-strip" id="stats_strip" style="display:none">
+    <div class="stat-box">
+      <div class="stat-num" id="stat_sessions">0</div>
+      <div class="stat-lbl">Sessions</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="stat_total" style="color:var(--accent)">0</div>
+      <div class="stat-lbl">Total Profit</div>
+    </div>
+  </div>
+</div>
+
+<!-- TARGET HIT OVERLAY -->
+<div class="target-overlay" id="target_overlay">
+  <div class="target-emoji">🎉</div>
+  <div class="target-title">Target Reached!</div>
+  <div class="target-sub" id="overlay_sub">You've hit your profit target. Excellent discipline!</div>
+  <button class="btn-continue" onclick="closeOverlay()">Continue Tracking</button>
+</div>
+
+<script>
+const STORE_KEY = 'martingale_v3';
+
+let state = {
+  bankroll: '',
+  initial_stake: '',
+  chances_per_session: '',
+  target: '',
+  stop_loss: '',
+  stake_rounding: 1,
+  current_session: 1,
+  current_chance: 1,
+  session_losses: 0,
+  session_gross_wins: 0,
+  sessions: [],
+  total_profit: 0,
+  target_hit: false,
+  last_lost_stake: 0,
+  last_lost_odds: 0,
+  chance_outcomes: [],
+  bet_history: []
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) state = { ...state, ...JSON.parse(raw) };
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+function save() { saveState(); }
+
+// Track which field is currently error-locked
+let _errorLockedField = null;
+
+function lockFieldOnError(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+  _errorLockedField = fieldId;
+  el.removeAttribute('readonly');
+  el.style.borderColor = 'var(--danger)';
+  el.style.boxShadow = '0 0 0 2px rgba(255,77,106,0.3)';
+  // Refocus after short delay to ensure DOM settled
+  setTimeout(() => { el.focus(); }, 50);
+  // Override onblur to re-lock unless error is gone
+  el.onblur = function() {
+    setTimeout(() => {
+      const stillError = document.getElementById(fieldId === 'initial_stake' || fieldId === 'bankroll'
+        ? 'balance_mismatch_alert' : 'stop_loss_alert');
+      if (stillError && stillError.style.display !== 'none' && _errorLockedField === fieldId) {
+        el.focus();
+      } else {
+        unlockFieldError(fieldId);
+      }
+    }, 100);
+  };
+}
+
+function unlockFieldError(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+  if (_errorLockedField === fieldId) _errorLockedField = null;
+  el.style.borderColor = '';
+  el.style.boxShadow = '';
+  el.onblur = function() {
+    this.setAttribute('readonly', '');
+    this.blur();
+  };
+}
+
+function clearAllFieldErrors() {
+  ['bankroll','initial_stake','target','stop_loss'].forEach(id => unlockFieldError(id));
+}
+
+function checkBalanceMismatch() {
+  const bankroll = parseFloat(state.bankroll) || 0;
+  const initStake = parseFloat(state.initial_stake) || 0;
+  const mismatchEl = document.getElementById('balance_mismatch_alert');
+  if (!mismatchEl) return;
+  if (bankroll > 0 && initStake > 0) {
+    const currentBal = bankroll + state.total_profit;
+    if (initStake > currentBal) {
+      mismatchEl.style.display = 'block';
+      mismatchEl.style.borderColor = 'var(--danger)';
+      mismatchEl.style.background = '#ff4d6a18';
+      mismatchEl.style.color = 'var(--danger)';
+      mismatchEl.textContent = '⚠️ Initial stake (' + initStake.toLocaleString() + ') exceeds current balance (' + Math.round(currentBal).toLocaleString() + ') — bet will be blocked.';
+      lockFieldOnError('initial_stake');
+    } else if (initStake > currentBal * 0.5 && currentBal > 0) {
+      mismatchEl.style.display = 'block';
+      mismatchEl.style.borderColor = 'var(--warn)';
+      mismatchEl.style.background = 'rgba(245,158,11,0.1)';
+      mismatchEl.style.color = 'var(--warn)';
+      mismatchEl.textContent = '⚠️ Initial stake is more than 50% of bankroll — high risk.';
+      // High risk is a warning only — don't lock, just highlight
+      const el = document.getElementById('initial_stake');
+      if (el) { el.style.borderColor = 'var(--warn)'; el.style.boxShadow = '0 0 0 2px rgba(245,158,11,0.25)'; }
+      unlockFieldError('initial_stake');
+    } else {
+      mismatchEl.style.display = 'none';
+      unlockFieldError('initial_stake');
+    }
+  } else {
+    mismatchEl.style.display = 'none';
+    unlockFieldError('initial_stake');
+  }
+}
+
+function checkStopLoss() {
+  const sl = parseFloat(state.stop_loss) || 0;
+  const bankroll = parseFloat(state.bankroll) || 0;
+  const initStake = parseFloat(state.initial_stake) || 0;
+  const slEl = document.getElementById('stop_loss_alert');
+  if (!slEl) return;
+
+  if (!sl) { slEl.style.display = 'none'; unlockFieldError('stop_loss'); return; }
+
+  const totalLoss = Math.max(0, -state.total_profit); // only positive when in loss
+
+  // ── Config validation alerts (field-lock errors) ──
+
+  // 1. Stop loss >= bankroll: would allow wiping entire bankroll
+  if (bankroll > 0 && sl >= bankroll) {
+    slEl.style.display = 'block';
+    slEl.style.background = '#ff4d6a18';
+    slEl.style.border = '1px solid var(--danger)';
+    slEl.style.color = 'var(--danger)';
+    slEl.textContent = '⚠️ Stop loss (' + sl.toLocaleString() + ') equals or exceeds your full bankroll (' + bankroll.toLocaleString() + ') — it must be less than your bankroll.';
+    lockFieldOnError('stop_loss');
+    return;
+  }
+
+  // 2. Stop loss < initial stake: can't even absorb one losing bet
+  if (initStake > 0 && sl < initStake) {
+    slEl.style.display = 'block';
+    slEl.style.background = 'rgba(245,158,11,0.1)';
+    slEl.style.border = '1px solid var(--warn)';
+    slEl.style.color = 'var(--warn)';
+    slEl.textContent = '⚠️ Stop loss (' + sl.toLocaleString() + ') is less than your initial stake (' + initStake.toLocaleString() + ') — it will trigger before your first bet completes.';
+    lockFieldOnError('stop_loss');
+    return;
+  }
+
+  // Config is valid — unlock field
+  unlockFieldError('stop_loss');
+
+  // ── Runtime alerts (no field lock) ──
+
+  // 3. Stop loss hit
+  if (totalLoss >= sl) {
+    slEl.style.display = 'block';
+    slEl.style.background = '#ff4d6a33';
+    slEl.style.border = '2px solid var(--danger)';
+    slEl.style.color = 'var(--danger)';
+    slEl.textContent = '🛑 STOP LOSS HIT — Total loss of ' + totalLoss.toLocaleString() + ' has reached your limit of ' + sl.toLocaleString() + '. No further bets allowed.';
+    return;
+  }
+
+  // 4. Approaching stop loss at 80%
+  if (totalLoss > 0 && totalLoss >= sl * 0.8) {
+    slEl.style.display = 'block';
+    slEl.style.background = 'rgba(245,158,11,0.1)';
+    slEl.style.border = '1px solid var(--warn)';
+    slEl.style.color = 'var(--warn)';
+    const pct = Math.round((totalLoss / sl) * 100);
+    slEl.textContent = '⚠️ Approaching stop loss — loss of ' + totalLoss.toLocaleString() + ' is ' + pct + '% of your limit (' + sl.toLocaleString() + ').';
+    return;
+  }
+
+  // All clear
+  slEl.style.display = 'none';
+}
+
+function saveAndUpdate() {
+  state.bankroll = document.getElementById('bankroll').value;
+  state.initial_stake = document.getElementById('initial_stake').value;
+  state.chances_per_session = document.getElementById('chances_per_session').value;
+  state.target = document.getElementById('target').value;
+  state.stop_loss = document.getElementById('stop_loss').value;
+  state.stake_rounding = parseInt(document.getElementById('stake_rounding').value) || 1;
+  saveState();
+  renderStatus();
+  checkBalanceMismatch();
+  checkStopLoss();
+  checkStopLoss();
+}
+
+function roundStake(value) {
+  const unit = parseInt(state.stake_rounding) || 1;
+  if (unit <= 1) return Math.round(value);
+  return Math.round(value / unit) * unit;
+}
+
+function calcStake(initial, chance, lastLostStake, lastLostOdds, lastWonStake, lastWonOdds, mode) {
+  if (!initial) return 0;
+  const init = parseFloat(initial);
+  const activeMode = mode || state.mode || 'default';
+  const maxChances = parseInt(state.chances_per_session) || 1;
+
+  if (activeMode === 'slots') {
+    // SLOTS mode: stake = (init × uncovered_slots) + recovery_value_of_previous_loss
+    const uncovered = maxChances - chance + 1;
+    const base = init * uncovered;
+    if (!lastLostStake || !lastLostOdds || lastLostOdds <= 1) return roundStake(base);
+    const recoveryValue = (lastLostStake * lastLostOdds) / (lastLostOdds - 1);
+    return roundStake(base + recoveryValue);
+  }
+  if (activeMode === 'opposite') {
+    // PAR mode: increase after wins, reset after losses
+    if (!lastWonStake || !lastWonOdds || lastWonOdds <= 1) return init;
+    const wonPotentialProfit = lastWonStake * (lastWonOdds - 1);
+    const boostAmount = (lastWonStake + wonPotentialProfit) / (lastWonOdds - 1);
+    return roundStake(init + boostAmount);
+  }
+  // MTG mode: increase after losses, reset after wins
+  if (!lastLostStake || !lastLostOdds || lastLostOdds <= 1) return init;
+  const lostPotentialProfit = lastLostStake * (lastLostOdds - 1);
+  const recoveryAmount = (lastLostStake + lostPotentialProfit) / (lastLostOdds - 1);
+  return roundStake(init + recoveryAmount);
+}
+
+function lockMode() {
+  const sel = document.getElementById('mode_select');
+  sel.disabled = true;
+  sel.style.opacity = '0.55';
+  sel.style.cursor = 'default';
+  document.getElementById('mode_lock_icon').style.display = 'inline';
+}
+
+function unlockMode() {
+  const sel = document.getElementById('mode_select');
+  sel.disabled = false;
+  sel.style.opacity = '1';
+  sel.style.cursor = 'pointer';
+  document.getElementById('mode_lock_icon').style.display = 'none';
+}
+
+function modeDesc(mode) {
+  if (mode === 'opposite') return 'Paroli: Stake held after losses, increased after wins.';
+  if (mode === 'slots') return 'Slots: Stake = initial × uncovered slots, loss recovery carried forward.';
+  return 'Martingale: Stake held after wins, increased after losses.';
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  save();
+  document.getElementById('mode_select').value = mode;
+  document.getElementById('mode_desc').textContent = modeDesc(mode);
+  renderStatus();
+}
+
+// ── Profit Line Chart ──────────────────────────────────────────────
+let chartVisible = false;
+let _chartAnimFrame = null;
+let _chartPulsePhase = 0;
+let _chartAnimating = false;
+
+function toggleProfitChart() {
+  chartVisible = !chartVisible;
+  const wrap  = document.getElementById('profit_chart_wrap');
+  const btn   = document.getElementById('chart_toggle_btn');
+  wrap.style.display  = chartVisible ? 'block' : 'none';
+  btn.textContent = chartVisible ? 'Hide' : 'Show';
+  btn.style.background  = chartVisible ? 'var(--accent)' : 'var(--surface2)';
+  btn.style.color       = chartVisible ? '#000' : 'var(--muted-text)';
+  btn.style.borderColor = chartVisible ? 'var(--accent)' : 'var(--border)';
+  if (chartVisible) { startChartAnimation(); }
+  else { stopChartAnimation(); }
+}
+
+let _drawAnimating = false;
+let _drawProgress = 1; // 0→1 draw progress
+let _drawFrame = null;
+
+function toggleChartDraw() {
+  if (!chartVisible) {
+    // Auto show chart first
+    toggleProfitChart();
+  }
+  _drawProgress = 0;
+  _drawAnimating = true;
+  const btn = document.getElementById('chart_anim_btn');
+  if (btn) {
+    btn.textContent = '⏳ Drawing...';
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#000';
+    btn.style.borderColor = 'var(--accent)';
+  }
+  if (_drawFrame) cancelAnimationFrame(_drawFrame);
+  function drawStep() {
+    _drawProgress += 0.004;
+    if (_drawProgress >= 1) {
+      _drawProgress = 1;
+      _drawAnimating = false;
+      const b = document.getElementById('chart_anim_btn');
+      if (b) {
+        b.textContent = '▶ Draw';
+        b.style.background = 'var(--surface2)';
+        b.style.color = 'var(--muted-text)';
+        b.style.borderColor = 'var(--border)';
+      }
+    }
+    drawProfitChart();
+    if (_drawAnimating) _drawFrame = requestAnimationFrame(drawStep);
+  }
+  drawStep();
+}
+
+function startChartAnimation() {
+  if (_chartAnimating) return;
+  _chartAnimating = true;
+  function loop() {
+    if (!chartVisible) { _chartAnimating = false; return; }
+    _chartPulsePhase += 0.07;
+    drawProfitChart();
+    _chartAnimFrame = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function stopChartAnimation() {
+  _chartAnimating = false;
+  if (_chartAnimFrame) cancelAnimationFrame(_chartAnimFrame);
+}
+
+function drawProfitChart() {
+  const canvas = document.getElementById('profit_chart');
+  if (!canvas) return;
+  const history = state.bet_history;
+
+  // Build cumulative profit points
+  const allPoints = [0];
+  let running = 0;
+  history.forEach(b => {
+    running += b.won ? Math.round(b.stake * (b.odds - 1)) : -b.stake;
+    allPoints.push(running);
+  });
+  // Apply draw animation progress clipping
+  const drawProg = typeof _drawProgress !== 'undefined' ? _drawProgress : 1;
+  const visibleCount = Math.max(2, Math.ceil(allPoints.length * drawProg));
+  const points = allPoints.slice(0, Math.min(visibleCount, allPoints.length));
+
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = rect.width || 300;
+  const H    = 180;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const target  = parseFloat(state.target) || 0;
+  const PAD     = { top: 24, right: 20, bottom: 32, left: 54 };
+  const cW      = W - PAD.left - PAD.right;
+  const cH      = H - PAD.top  - PAD.bottom;
+
+  const cs      = getComputedStyle(document.documentElement);
+  const accent  = cs.getPropertyValue('--accent').trim()     || '#00e5a0';
+  const danger  = cs.getPropertyValue('--danger').trim()     || '#ff4d6a';
+  const border  = cs.getPropertyValue('--border').trim()     || '#2a2a3a';
+  const mutedTx = cs.getPropertyValue('--muted-text').trim() || '#6b7280';
+  const surface = cs.getPropertyValue('--surface').trim()    || '#13131f';
+  const warn    = cs.getPropertyValue('--warn').trim()       || '#f59e0b';
+
+  const allVals = [...points, target > 0 ? target : 0];
+  let yMin = Math.min(...allVals);
+  let yMax = Math.max(...allVals);
+  if (yMax === yMin) { yMax += 1; yMin -= 1; }
+  const yPad = (yMax - yMin) * 0.15;
+  yMin -= yPad; yMax += yPad;
+
+  const xS = n => PAD.left + (n / (points.length - 1 || 1)) * cW;
+  const yS = v => PAD.top  + (1 - (v - yMin) / (yMax - yMin)) * cH;
+
+  const lastVal   = points[points.length - 1];
+  const lineColor = lastVal >= 0 ? accent : danger;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Background grid (horizontal + vertical) ──
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 0.8;
+
+  // Horizontal lines
+  const hLines = 5;
+  for (let t = 0; t <= hLines; t++) {
+    const y = PAD.top + (t / hLines) * cH;
+    ctx.strokeStyle = t === 0 || t === hLines ? '#ffffff22' : '#ffffff14';
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+  }
+
+  // Vertical lines
+  const vLines = 6;
+  for (let t = 0; t <= vLines; t++) {
+    const x = PAD.left + (t / vLines) * cW;
+    ctx.strokeStyle = '#ffffff10';
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + cH); ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // ── Zero line ──
+  const y0 = yS(0);
+  if (y0 >= PAD.top && y0 <= H - PAD.bottom) {
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = warn;
+    ctx.lineWidth = 1.4;
+    ctx.shadowColor = warn;
+    ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y0); ctx.lineTo(W - PAD.right, y0); ctx.stroke();
+    // Zero label pill on Y axis
+    ctx.shadowBlur = 0;
+    const zPillW = 22;
+    ctx.fillStyle = warn + '33';
+    ctx.beginPath();
+    ctx.roundRect
+      ? ctx.roundRect(PAD.left - zPillW - 3, y0 - 8, zPillW, 13, 3)
+      : ctx.rect(PAD.left - zPillW - 3, y0 - 8, zPillW, 13);
+    ctx.fill();
+    ctx.fillStyle = warn;
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('0', PAD.left - 5, y0 + 3);
+    ctx.restore();
+  }
+
+  // ── Target line with animated shimmer ──
+  if (target > 0) {
+    const yt = yS(target);
+    if (yt >= PAD.top && yt <= H - PAD.bottom) {
+      const shimmerAlpha = 0.4 + 0.3 * Math.sin(_chartPulsePhase * 1.2);
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = accent + Math.round(shimmerAlpha * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(PAD.left, yt); ctx.lineTo(W - PAD.right, yt); ctx.stroke();
+      // Target value on Y axis
+      const targetLabel = target >= 1000 ? (target / 1000).toFixed(1) + 'k' : target.toString();
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = accent;
+      // Small pill background on Y axis
+      const tlW = ctx.measureText(targetLabel).width + 6;
+      ctx.fillStyle = accent + '33';
+      ctx.beginPath();
+      ctx.roundRect
+        ? ctx.roundRect(PAD.left - tlW - 3, yt - 8, tlW, 13, 3)
+        : ctx.rect(PAD.left - tlW - 3, yt - 8, tlW, 13);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.fillText(targetLabel, PAD.left - 5, yt + 3);
+      // Inline label on line
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = accent;
+      ctx.fillText('▶ TARGET', PAD.left + 4, yt - 4);
+      ctx.restore();
+    }
+  }
+
+  if (points.length < 2) {
+    ctx.fillStyle = mutedTx;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Place your first bet to see the chart', W / 2, H / 2);
+    return;
+  }
+
+  // ── Gradient fill ──
+  const grad = ctx.createLinearGradient(0, PAD.top, 0, H - PAD.bottom);
+  grad.addColorStop(0, lineColor + '55');
+  grad.addColorStop(0.6, lineColor + '18');
+  grad.addColorStop(1, lineColor + '00');
+  ctx.beginPath();
+  ctx.moveTo(xS(0), yS(points[0]));
+  points.forEach((v, i) => { if (i > 0) ctx.lineTo(xS(i), yS(v)); });
+  ctx.lineTo(xS(points.length - 1), yS(Math.max(yMin, Math.min(0, yMin))));
+  ctx.lineTo(xS(0), yS(Math.max(yMin, Math.min(0, yMin))));
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // ── Glowing line shadow ──
+  ctx.save();
+  ctx.shadowColor = lineColor;
+  ctx.shadowBlur = 8;
+  for (let i = 1; i < points.length; i++) {
+    const c = points[i] >= 0 ? accent : danger;
+    ctx.beginPath();
+    ctx.moveTo(xS(i-1), yS(points[i-1]));
+    ctx.lineTo(xS(i), yS(points[i]));
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Intermediate dots (wins/losses) ──
+  points.forEach((v, i) => {
+    if (i === points.length - 1) return; // skip last — drawn animated below
+    const x = xS(i), y = yS(v);
+    const c = v >= 0 ? accent : danger;
+    ctx.beginPath();
+    ctx.arc(x, y, i === 0 ? 3.5 : 2, 0, Math.PI * 2);
+    ctx.fillStyle = c + 'cc';
+    ctx.fill();
+    ctx.strokeStyle = surface;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // ── Animated pulsing dot on latest point ──
+  const lx = xS(points.length - 1);
+  const ly = yS(lastVal);
+  const pulse = 0.5 + 0.5 * Math.sin(_chartPulsePhase);
+  const outerR = 8 + 5 * pulse;
+  const glowAlpha = Math.round((0.1 + 0.18 * pulse) * 255).toString(16).padStart(2,'0');
+
+  // Outer glow ring
+  ctx.beginPath();
+  ctx.arc(lx, ly, outerR, 0, Math.PI * 2);
+  ctx.fillStyle = lineColor + glowAlpha;
+  ctx.fill();
+
+  // Mid ring
+  ctx.beginPath();
+  ctx.arc(lx, ly, 6, 0, Math.PI * 2);
+  ctx.fillStyle = lineColor + '55';
+  ctx.fill();
+
+  // Solid inner dot
+  ctx.beginPath();
+  ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+  ctx.strokeStyle = surface;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Blinking profit label next to pulsing dot ──
+  const labelAlpha = 0.55 + 0.45 * Math.sin(_chartPulsePhase * 1.1);
+  const sign = lastVal >= 0 ? '+' : '';
+  const labelTxt = sign + (Math.abs(lastVal) >= 1000
+    ? (lastVal / 1000).toFixed(1) + 'k'
+    : lastVal.toLocaleString());
+
+  ctx.font = 'bold 11px monospace';
+  const textW = ctx.measureText(labelTxt).width;
+  const pillPad = 4;
+  const pillW = textW + pillPad * 2;
+  // Clamp horizontally so label never exits canvas
+  let lbX = lx + 10;
+  if (lbX + pillW > W - PAD.right) lbX = lx - pillW - 6;
+  // Clamp vertically
+  let lbY = ly - 6;
+  if (lbY - 11 < PAD.top) lbY = ly + 16;
+
+  // Background pill for label
+  ctx.fillStyle = lineColor + Math.round(labelAlpha * 0.3 * 255).toString(16).padStart(2,'0');
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(lbX - pillPad, lbY - 11, pillW, 15, 4);
+  } else {
+    ctx.rect(lbX - pillPad, lbY - 11, pillW, 15);
+  }
+  ctx.fill();
+
+  // Border on pill
+  ctx.strokeStyle = lineColor + Math.round(labelAlpha * 0.5 * 255).toString(16).padStart(2,'0');
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = lineColor + Math.round(labelAlpha * 255).toString(16).padStart(2,'0');
+  ctx.textAlign = 'left';
+  ctx.fillText(labelTxt, lbX, lbY);
+
+  // ── Y axis labels ──
+  ctx.fillStyle = mutedTx;
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'right';
+  ctx.setLineDash([]);
+  for (let t = 0; t <= 4; t++) {
+    const v = yMin + (t / 4) * (yMax - yMin);
+    const y = yS(v);
+    const label = Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v).toString();
+    ctx.fillText(label, PAD.left - 6, y + 3);
+  }
+
+  // ── X axis labels ──
+  ctx.textAlign = 'center';
+  ctx.font = '9px monospace';
+  const step = Math.max(1, Math.ceil((points.length - 1) / 6));
+  for (let i = 0; i < points.length - 1; i += step) {
+    ctx.fillText(i, xS(i), H - PAD.bottom + 14);
+  }
+  ctx.fillText(points.length - 1, xS(points.length - 1), H - PAD.bottom + 14);
+
+  // ── Win/Loss streak indicators at bottom ──
+  const dotR = 3;
+  const dotY = H - PAD.bottom + 24;
+  const visibleBets = points.length - 1;
+  history.slice(0, visibleBets).forEach((b, i) => {
+    const x = xS(i + 1);
+    ctx.beginPath();
+    ctx.arc(x, dotY, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = b.won ? accent + 'bb' : danger + 'bb';
+    ctx.fill();
+  });
+
+  // ── Target notification bar ──
+  // During animation: only show once animated line has passed the target crossing point
+  const notifyEl = document.getElementById('chart_target_notify');
+  if (notifyEl) {
+    const tVal = parseFloat(state.target) || 0;
+    let showNotify = false;
+    if (state.target_hit && tVal > 0) {
+      if (_drawAnimating) {
+        // Find the first point in the visible slice that crossed the target
+        const crossedInView = points.some(v => v >= tVal);
+        showNotify = crossedInView;
+      } else {
+        showNotify = true;
+      }
+    }
+    if (showNotify) {
+      notifyEl.style.display = 'block';
+      const tLabel = tVal >= 1000 ? (tVal/1000).toFixed(1)+'k' : tVal.toLocaleString();
+      notifyEl.textContent = '🎯 TARGET +' + tLabel + ' REACHED!';
+    } else {
+      notifyEl.style.display = 'none';
+    }
+  }
+
+  // ── Update next stake and bankroll overlays ──
+  // When draw animation is active, derive values from the animated slice
+  const _init = parseFloat(state.initial_stake) || 0;
+  const bankrollBase = parseFloat(state.bankroll) || 0;
+  const visibleBetCount = points.length - 1; // points[0] is always 0 start
+  const animatedProfit = points[points.length - 1];
+
+  // Replay last_lost / last_won from visible slice to get correct next stake
+  let _animLostStake = 0, _animLostOdds = 0, _animWonStake = 0, _animWonOdds = 0;
+  if (_drawAnimating) {
+    history.slice(0, visibleBetCount).forEach(b => {
+      if (state.mode === 'opposite') {
+        if (b.won) { _animWonStake = b.stake; _animWonOdds = b.odds; }
+        else { _animWonStake = 0; _animWonOdds = 0; }
+      } else {
+        if (!b.won) { _animLostStake = b.stake; _animLostOdds = b.odds; }
+        else { _animLostStake = 0; _animLostOdds = 0; }
+      }
+    });
+  } else {
+    _animLostStake = state.last_lost_stake;
+    _animLostOdds  = state.last_lost_odds;
+    _animWonStake  = state.last_won_stake;
+    _animWonOdds   = state.last_won_odds;
+  }
+
+  const _nextStake = calcStake(_init, state.current_chance, _animLostStake, _animLostOdds, _animWonStake, _animWonOdds);
+  const stakeEl = document.getElementById('chart_next_stake');
+  if (stakeEl) {
+    stakeEl.textContent = _nextStake >= 1000
+      ? (_nextStake / 1000).toFixed(1) + 'k'
+      : (_nextStake ? _nextStake.toLocaleString() : '—');
+  }
+
+  const animBankroll = bankrollBase ? bankrollBase + animatedProfit : 0;
+  const bkEl = document.getElementById('chart_bankroll_val');
+  const arEl = document.getElementById('chart_arrow');
+  if (bkEl && bankrollBase) {
+    bkEl.textContent = Math.abs(animBankroll) >= 1000
+      ? (animBankroll / 1000).toFixed(1) + 'k'
+      : Math.round(animBankroll).toLocaleString();
+    bkEl.style.color = animatedProfit >= 0 ? accent : danger;
+  }
+  if (arEl) {
+    const up = animatedProfit >= 0;
+    arEl.textContent = up ? '▲' : '▼';
+    arEl.style.color = up ? accent : danger;
+    arEl.style.opacity = Math.sin(_chartPulsePhase * 2.5) > 0 ? '1' : '0';
+  }
+}
+
+// ── End Chart ──────────────────────────────────────────────────────
+
+
+function renderStatus() {
+  const init = parseFloat(state.initial_stake) || 0;
+  const sess = state.current_session;
+  const ch = state.current_chance;
+  const stake = calcStake(init, ch, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+  const target = parseFloat(state.target) || 0;
+  const bankroll = parseFloat(state.bankroll) || 0;
+
+  document.getElementById('display_session').textContent = sess;
+  document.getElementById('bet_count_badge').textContent = state.bet_history.length;
+  checkBalanceMismatch();
+  if (state.bet_history.length > 0) lockMode(); else unlockMode();
+  if (chartVisible) startChartAnimation();
+  const _mode = state.mode || 'default';
+  document.getElementById('mode_select').value = _mode;
+  document.getElementById('mode_desc').textContent = modeDesc(_mode);
+  const _mp = state.match_period || 'FT';
+  document.getElementById('score_period_label').textContent = _mp === 'HT' ? 'Half Time' : 'Full Time';
+  document.getElementById('display_chance').textContent = ch;
+  document.getElementById('display_stake').textContent = stake ? stake.toLocaleString() : '—';
+  const currentBal = bankroll + state.total_profit;
+  const balEl = document.getElementById('display_bankroll');
+  balEl.textContent = bankroll ? currentBal.toLocaleString() : '—';
+  // Colour-code bankroll: red if depleted, orange if below 20%, green if healthy
+  if (bankroll > 0) {
+    if (currentBal <= 0) {
+      balEl.style.color = 'var(--danger)';
+      balEl.title = '⚠️ Bankroll depleted!';
+    } else if (currentBal < bankroll * 0.2) {
+      balEl.style.color = 'var(--warn)';
+      balEl.title = '⚠️ Low balance: below 20% of original bankroll';
+    } else {
+      balEl.style.color = '';
+      balEl.title = '';
+    }
+  }
+  const sl = state.session_losses || 0;
+  document.getElementById('display_sess_loss').textContent = sl > 0 ? '-' + sl.toLocaleString() : '—';
+
+  // Chance dots
+  const maxChances = parseInt(state.chances_per_session) || 0;
+  const dotsEl = document.getElementById('chance_dots');
+  dotsEl.innerHTML = '';
+  for (let i = 1; i <= maxChances; i++) {
+    const d = document.createElement('div');
+    const outcome = state.chance_outcomes[i - 1];
+    if (outcome === 'win') {
+      d.className = 'dot win';
+    } else if (outcome === 'loss') {
+      d.className = 'dot loss';
+    } else if (i === ch) {
+      d.className = 'dot active';
+    } else {
+      d.className = 'dot';
+    }
+    dotsEl.appendChild(d);
+  }
+
+  // Progress bar
+  const profit = state.total_profit;
+  const pct = target > 0 ? Math.max(0, Math.min(100, Math.round((profit / target) * 100))) : 0;
+  document.getElementById('progress_bar').style.width = pct + '%';
+  const profitSign = profit > 0 ? '+' : '';
+  const recoveryNote = profit < 0 && target > 0 ? '  (need +' + (target - profit).toLocaleString() + ' to reach target)' : '';
+  document.getElementById('progress_lbl').textContent = profitSign + profit.toLocaleString() + ' / ' + (target ? target.toLocaleString() : '—') + recoveryNote;
+}
+
+function renderSummary() {
+  const sessions = state.sessions;
+  const body = document.getElementById('summary_body');
+  const strip = document.getElementById('stats_strip');
+
+  if (!sessions.length) {
+    body.innerHTML = '<div class="empty-state">No completed sessions yet. Good luck! 🍀</div>';
+    strip.style.display = 'none';
+    return;
+  }
+
+  let rows = '';
+  sessions.forEach((s, i) => {
+    const netCls = s.profit > 0 ? 'profit-pos' : s.profit < 0 ? 'profit-neg' : 'profit-zero';
+    const netSign = s.profit > 0 ? '+' : '';
+    const grossStr = s.gross_win > 0 ? '+' + s.gross_win.toLocaleString() : '—';
+    const lossStr = s.losses_before > 0 ? '-' + s.losses_before.toLocaleString() : '—';
+    rows += `<tr>
+      <td>${i + 1}</td>
+      <td style="text-align:center">${s.chances_used}/${s.max_chances}</td>
+      <td class="profit-pos" style="text-align:right">${grossStr}</td>
+      <td class="profit-neg" style="text-align:right">${lossStr}</td>
+      <td class="${netCls}" style="text-align:right;font-weight:600">${netSign}${s.profit.toLocaleString()}</td>
+    </tr>`;
+  });
+
+  // Sum only committed (closed) sessions — not the live running total_profit
+  const total = sessions.reduce((sum, s) => sum + s.profit, 0);
+  const totalCls = total > 0 ? 'profit-pos' : total < 0 ? 'profit-neg' : 'profit-zero';
+  const totalSign = total > 0 ? '+' : '';
+
+  body.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="summary-table" style="min-width:420px">
+    <thead><tr><th>Sess</th><th style="text-align:center">Chances</th><th style="text-align:right">Gross Win</th><th style="text-align:right">Losses</th><th style="text-align:right">Net</th></tr></thead>
+    <tbody>${rows}<tr class="total-row"><td colspan="4">Total</td><td class="${totalCls}" style="text-align:right">${totalSign}${total.toLocaleString()}</td></tr></tbody>
+  </table></div>`;
+
+  strip.style.display = 'grid';
+  document.getElementById('stat_sessions').textContent = sessions.length;
+  document.getElementById('stat_total').textContent = totalSign + total.toLocaleString();
+  document.getElementById('stat_total').style.color = total >= 0 ? 'var(--accent)' : 'var(--danger)';
+}
+
+function getPredictionResult(prediction, home, away) {
+  const h = parseInt(home), a = parseInt(away), total = h + a;
+  switch (prediction) {
+    case 'Home Win':      return h > a;
+    case 'Draw':          return h === a;
+    case 'Away Win':      return a > h;
+    case 'Over 1.5':      return total > 1.5;
+    case 'Under 1.5':     return total < 1.5;
+    case 'Over 2.5':      return total > 2.5;
+    case 'Under 2.5':     return total < 2.5;
+    case 'Over 3.5':      return total > 3.5;
+    case 'Under 3.5':     return total < 3.5;
+    case 'Both Score - Yes': return h > 0 && a > 0;
+    case 'Both Score - No':  return h === 0 || a === 0;
+    case 'Either Team Over 2.5': return h > 2.5 || a > 2.5;
+    default:
+      // Correct Score: value format "CS H-A"
+      if (prediction.startsWith('CS ')) {
+        const parts = prediction.slice(3).split('-');
+        return h === parseInt(parts[0]) && a === parseInt(parts[1]);
+      }
+      return false;
+  }
+}
+
+function setMatchPeriod(period) {
+  state.match_period = period;
+  save();
+  document.getElementById('btn_ft').style.background = period === 'FT' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btn_ft').style.color = period === 'FT' ? '#000' : 'var(--muted-text)';
+  document.getElementById('btn_ht').style.background = period === 'HT' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btn_ht').style.color = period === 'HT' ? '#000' : 'var(--muted-text)';
+  document.getElementById('score_period_label').textContent = period === 'HT' ? 'Half Time' : 'Full Time';
+}
+
+function onPredictionChange() {
+  const pred = document.getElementById('prediction').value;
+  const bar = document.getElementById('pred_confirm_bar');
+  const csPicker = document.getElementById('cs_picker_row');
+  // Show/hide correct score picker
+  if (pred === 'Correct Score') {
+    csPicker.style.display = 'flex';
+    document.getElementById('cs_score').value = '';
+    bar.style.display = 'none'; // wait for score selection
+    lockScoreFields();
+    return;
+  } else {
+    csPicker.style.display = 'none';
+  }
+  if (pred) {
+    showConfirmBar(pred);
+  } else {
+    bar.style.display = 'none';
+    lockScoreFields();
+  }
+}
+
+function onCSScoreChange() {
+  const score = document.getElementById('cs_score').value;
+  if (score) showConfirmBar(score);
+}
+
+function showConfirmBar(pred) {
+  const bar = document.getElementById('pred_confirm_bar');
+  const init = parseFloat(state.initial_stake) || 0;
+  const stake = calcStake(init, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+  const odds = parseFloat(document.getElementById('odds').value);
+  const betId = document.getElementById('bet_id').value;
+  const displayPred = pred.startsWith('CS ') ? 'Correct Score ' + pred.slice(3) : pred;
+  document.getElementById('betid_confirm_label').textContent = betId ? '#' + betId : '(not entered)';
+  document.getElementById('odds_confirm_label').textContent = odds >= 1.01 ? odds.toFixed(2) : '(enter odds)';
+  document.getElementById('period_confirm_label').textContent = (state.match_period || 'FT') === 'FT' ? 'Full Time' : 'Half Time';
+  document.getElementById('pred_confirm_label').textContent = displayPred;
+  document.getElementById('stake_confirm_label').textContent = stake ? stake.toLocaleString() : '(set initial stake)';
+  bar.style.display = 'flex';
+}
+
+function confirmPrediction() {
+  // Check stop loss before allowing confirm
+  const _sl = parseFloat(state.stop_loss) || 0;
+  if (_sl > 0 && -state.total_profit >= _sl) {
+    flashBanner('🛑 Stop loss of ' + _sl.toLocaleString() + ' hit — no further bets allowed.', 'loss');
+    return;
+  }
+  // Check balance before allowing confirm
+  const _bankroll = parseFloat(state.bankroll) || 0;
+  const _initStake = parseFloat(state.initial_stake) || 0;
+  if (_bankroll > 0 && _initStake > 0) {
+    const _currentBal = _bankroll + state.total_profit;
+    const _stake = calcStake(_initStake, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+    if (_currentBal <= 0) {
+      flashBanner('⚠️ Cannot confirm — bankroll is fully depleted (' + Math.round(_currentBal).toLocaleString() + ').', 'loss');
+      return;
+    }
+    if (_stake > _currentBal) {
+      flashBanner('⚠️ Cannot confirm — stake ' + _stake.toLocaleString() + ' exceeds balance ' + Math.round(_currentBal).toLocaleString() + '.', 'loss');
+      return;
+    }
+  }
+  save();
+  // Lock bet_id, odds, period and prediction
+  document.getElementById('bet_id').disabled = true;
+  document.getElementById('bet_id').style.opacity = '0.7';
+  document.getElementById('odds').disabled = true;
+  document.getElementById('odds').style.opacity = '0.7';
+  document.getElementById('btn_ft').disabled = true;
+  document.getElementById('btn_ht').disabled = true;
+  document.getElementById('btn_ft').style.opacity = '0.7';
+  document.getElementById('btn_ht').style.opacity = '0.7';
+  document.getElementById('prediction').disabled = true;
+  document.getElementById('prediction').style.opacity = '0.7';
+  document.getElementById('cs_score').disabled = true;
+  document.getElementById('cs_score').style.opacity = '0.7';
+  document.getElementById('pred_confirm_bar').style.display = 'none';
+  // Now unlock score fields
+  unlockScoreFields();
+}
+
+function changePrediction() {
+  document.getElementById('bet_id').disabled = false;
+  document.getElementById('bet_id').style.opacity = '1';
+  document.getElementById('odds').disabled = false;
+  document.getElementById('odds').style.opacity = '1';
+  document.getElementById('btn_ft').disabled = false;
+  document.getElementById('btn_ht').disabled = false;
+  document.getElementById('btn_ft').style.opacity = '1';
+  document.getElementById('btn_ht').style.opacity = '1';
+  document.getElementById('prediction').disabled = false;
+  document.getElementById('prediction').style.opacity = '1';
+  document.getElementById('cs_score').disabled = false;
+  document.getElementById('cs_score').style.opacity = '1';
+  document.getElementById('cs_score').value = '';
+  document.getElementById('cs_picker_row').style.display = 'none';
+  document.getElementById('prediction').value = '';
+  document.getElementById('pred_confirm_bar').style.display = 'none';
+  lockScoreFields();
+}
+
+function unlockScoreFields() {
+  const home = document.getElementById('score_home');
+  const away = document.getElementById('score_away');
+  home.disabled = false; away.disabled = false;
+  home.style.opacity = '1'; away.style.opacity = '1';
+  home.style.pointerEvents = ''; away.style.pointerEvents = '';
+}
+
+function lockScoreFields() {
+  const home = document.getElementById('score_home');
+  const away = document.getElementById('score_away');
+  home.disabled = true; away.disabled = true;
+  home.style.opacity = '0.4'; away.style.opacity = '0.4';
+  home.style.pointerEvents = 'none'; away.style.pointerEvents = 'none';
+}
+
+function toggleBetHistory() {
+  const panel = document.getElementById('bet_history_panel');
+  const arrow = document.getElementById('bet_history_arrow');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function renderBetHistory() {
+  const body = document.getElementById('bet_history_body');
+  if (!body) return;
+  const bets = state.bet_history;
+  if (!bets || bets.length === 0) {
+    body.innerHTML = '<div class="empty-state" style="padding:12px 0;">No bets recorded yet.</div>';
+    return;
+  }
+  const rows = [...bets].reverse().map(b => {
+    const winCls = b.won ? 'profit-pos' : 'profit-neg';
+    const winLabel = b.won ? '✅ Win' : '❌ Loss';
+    const score = (b.home !== '' && b.away !== '') ? b.home + ' – ' + b.away : '—';
+    return `<div style="border-bottom:1px solid var(--border);padding:8px 2px;font-size:12px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:start;">
+      <span style="color:var(--muted-text);font-size:11px;white-space:nowrap;">S${b.session} C${b.chance}${b.bet_id ? ' · #' + b.bet_id : ''}</span>
+      <span style="color:var(--text);font-weight:500;">${b.match_period ? '<span style=\'font-size:10px;padding:1px 5px;border-radius:4px;background:var(--border);margin-right:4px;\'>' + b.match_period + '</span>' : ''}${b.prediction}</span>
+      <span class="${winCls}" style="font-weight:600;text-align:right;">${winLabel}</span>
+      <span style="color:var(--muted-text);">Odds: ${b.odds}</span>
+      <span style="color:var(--muted-text);">Score: ${score}</span>
+      <span style="color:var(--muted-text);text-align:right;">Stake: ${b.stake.toLocaleString()}</span>
+    </div>`;
+  }).join('');
+  body.innerHTML = rows;
+}
+
+function submitBet() {
+  let pred = document.getElementById('prediction').value;
+  if (pred === 'Correct Score') {
+    const cs = document.getElementById('cs_score').value;
+    if (!cs) { flashBanner('Please select a correct score.', 'loss'); return; }
+    pred = cs;
+  }
+  const odds = parseFloat(document.getElementById('odds').value);
+  const home = document.getElementById('score_home').value;
+  const away = document.getElementById('score_away').value;
+
+  const betIdVal = document.getElementById('bet_id').value;
+  if (!betIdVal) { flashBanner('Please enter a Bet ID.', 'loss'); return; }
+  if (!pred) { flashBanner('Please select a prediction.', 'loss'); return; }
+  if (!odds || odds < 1.01) { flashBanner('Please enter valid odds (min 1.01).', 'loss'); return; }
+  if (home === '' || away === '') { flashBanner('Please enter the match score.', 'loss'); return; }
+  if (!state.initial_stake) { flashBanner('Please set your initial stake first.', 'loss'); return; }
+  if (!state.chances_per_session) { flashBanner('Please set chances per session first.', 'loss'); return; }
+  const _slCheck = parseFloat(state.stop_loss) || 0;
+  if (_slCheck > 0 && -state.total_profit >= _slCheck) {
+    flashBanner('🛑 Stop loss of ' + _slCheck.toLocaleString() + ' hit — no further bets allowed.', 'loss');
+    return;
+  }
+
+  const init = parseFloat(state.initial_stake);
+  const maxCh = parseInt(state.chances_per_session);
+  const stake = calcStake(init, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+
+  // ── Balance check ──
+  const bankrollSet = parseFloat(state.bankroll) || 0;
+  if (bankrollSet > 0) {
+    const currentBalance = bankrollSet + state.total_profit;
+    if (currentBalance <= 0) {
+      flashBanner('⚠️ Insufficient balance — bankroll is depleted ('+Math.round(currentBalance).toLocaleString()+').', 'loss');
+      return;
+    }
+    if (stake > currentBalance) {
+      flashBanner('⚠️ Insufficient balance — stake '+stake.toLocaleString()+' exceeds current bankroll '+Math.round(currentBalance).toLocaleString()+'.', 'loss');
+      return;
+    }
+    // Warn (but allow) if balance will drop below 20% of original after this stake
+    const afterStake = currentBalance - stake;
+    if (afterStake < bankrollSet * 0.2 && afterStake > 0) {
+      const proceed = confirm('⚠️ Low balance warning: placing this stake of '+stake.toLocaleString()+' will leave you with '+Math.round(afterStake).toLocaleString()+' ('+Math.round((afterStake/bankrollSet)*100)+'% of original bankroll). Proceed?');
+      if (!proceed) return;
+    }
+  }
+
+  const won = getPredictionResult(pred, home, away);
+  const isLastChance = state.current_chance >= maxCh;
+
+  // Record into bet history
+  state.bet_history.push({
+    bet_id: parseInt(betIdVal),
+    session: state.current_session,
+    chance: state.current_chance,
+    match_period: state.match_period || 'FT',
+    prediction: pred,
+    odds: odds,
+    stake: stake,
+    home: home,
+    away: away,
+    won: won
+  });
+  saveState();
+  if (state.bet_history.length === 1) lockMode();
+
+  if (won) {
+    const grossWin = Math.round(stake * (odds - 1));
+    state.session_gross_wins += grossWin;
+    state.total_profit += grossWin;
+    state.chance_outcomes[state.current_chance - 1] = 'win';
+
+    // Win handling per mode
+    // Save last loss context before resetting (needed for session-close carry)
+    const _prevLostStake = state.last_lost_stake;
+    const _prevLostOdds = state.last_lost_odds;
+    if (state.mode === 'opposite') {
+      state.last_won_stake = stake;
+      state.last_won_odds = odds;
+    } else {
+      // MTG and SLOTS: win resets loss tracker
+      state.last_lost_stake = 0;
+      state.last_lost_odds = 0;
+    }
+
+    const targetVal = parseFloat(state.target);
+    const targetHitNow = targetVal > 0 && state.total_profit >= targetVal && !state.target_hit;
+
+    if (isLastChance || targetHitNow) {
+      // Close session: all chances used, or target hit
+      const sessionNet = state.session_gross_wins - state.session_losses;
+      state.sessions.push({
+        profit: sessionNet,
+        gross_win: state.session_gross_wins,
+        losses_before: state.session_losses,
+        chances_used: state.current_chance,
+        max_chances: maxCh
+      });
+      state.current_session += 1;
+      state.current_chance = 1;
+      state.session_losses = 0;
+      state.session_gross_wins = 0;
+      state.chance_outcomes = [];
+      // MTG: if last chance won but there was a prior loss this session, carry it
+      if (state.mode === 'default' && _prevLostStake && _prevLostOdds) {
+        state.last_lost_stake = _prevLostStake;
+        state.last_lost_odds = _prevLostOdds;
+      } else {
+        state.last_lost_stake = 0; state.last_lost_odds = 0;
+      }
+      state.last_won_stake = 0; state.last_won_odds = 0;
+
+      const closeReason = targetHitNow ? ' Target reached!' : ' Session complete!';
+      const nextCh1Stake = calcStake(init, 1, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+      const winCloseNote = (state.mode === 'default' && state.last_lost_stake)
+        ? ' Last chance loss carried — next session opens at: ' + nextCh1Stake.toLocaleString() + '.'
+        : ' Next session resets to initial stake: ' + nextCh1Stake.toLocaleString() + '.';
+      flashBanner('WIN! +' + grossWin.toLocaleString() + ' | Session net: ' + (sessionNet >= 0 ? '+' : '') + sessionNet.toLocaleString() + '.' + closeReason + winCloseNote, 'win');
+
+      if (targetHitNow) {
+        state.target_hit = true;
+        showTargetOverlay();
+      }
+    } else {
+      // Continue session, next chance starts fresh at initial stake
+      state.current_chance += 1;
+      flashBanner('WIN (+' + grossWin.toLocaleString() + ') on chance ' + (state.current_chance - 1) + '. Stake resets to ' + init.toLocaleString() + ' for chance ' + state.current_chance + '.', 'win');
+    }
+  } else {
+    if (state.mode === 'opposite') {
+      state.last_won_stake = 0;
+      state.last_won_odds = 0;
+    } else if (state.mode === 'slots') {
+      // SLOTS: carry lost stake AND odds for recovery value calculation
+      state.last_lost_stake = stake;
+      state.last_lost_odds = odds;
+    } else {
+      state.last_lost_stake = stake;
+      state.last_lost_odds = odds;
+    }
+    state.session_losses += stake;
+    state.total_profit -= stake;
+    state.chance_outcomes[state.current_chance - 1] = 'loss';
+
+    if (isLastChance) {
+      // All chances exhausted, close session
+      const sessionNet = state.session_gross_wins - state.session_losses;
+      state.sessions.push({
+        profit: sessionNet,
+        gross_win: state.session_gross_wins,
+        losses_before: state.session_losses,
+        chances_used: maxCh,
+        max_chances: maxCh
+      });
+      state.current_session += 1;
+      state.current_chance = 1;
+      state.session_losses = 0;
+      state.session_gross_wins = 0;
+      state.chance_outcomes = [];
+      // If session net is negative, keep last_lost_stake & last_lost_odds so
+      // chance 1 of the next session recovers the overall session loss.
+      // If session net is positive, reset to initial stake.
+      if (state.mode === 'opposite') {
+        if (sessionNet <= 0) { state.last_won_stake = 0; state.last_won_odds = 0; }
+        state.last_lost_stake = 0; state.last_lost_odds = 0;
+      } else if (state.mode === 'slots') {
+        // SLOTS: carry last_lost_stake into next session if net negative
+        if (sessionNet >= 0) { state.last_lost_stake = 0; state.last_lost_odds = 0; }
+        state.last_won_stake = 0; state.last_won_odds = 0;
+      } else {
+        // MTG: always carry the last loss into next session regardless of session net
+        // (session may be net positive but last chance still lost — that loss needs recovery)
+        state.last_won_stake = 0; state.last_won_odds = 0;
+      }
+      const nextCh1Stake = calcStake(init, 1, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+      let nextMsg;
+      if (sessionNet < 0) {
+        nextMsg = 'Next session chance 1 stake: ' + nextCh1Stake.toLocaleString() + ' (recovering session loss).';
+      } else if (state.mode === 'default' && state.last_lost_stake) {
+        nextMsg = 'Session net positive but last chance lost — next session opens at: ' + nextCh1Stake.toLocaleString() + ' (recovering last loss).';
+      } else {
+        nextMsg = 'Next session resets to initial stake: ' + nextCh1Stake.toLocaleString() + '.';
+      }
+      flashBanner('All ' + maxCh + ' chances used. Session net: ' + (sessionNet >= 0 ? '+' : '') + sessionNet.toLocaleString() + '. ' + nextMsg, 'loss');
+    } else {
+      state.current_chance += 1;
+      const nextStake = calcStake(init, state.current_chance, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
+      flashBanner('Loss (-' + stake.toLocaleString() + '). Session losses: -' + state.session_losses.toLocaleString() + '. Next stake: ' + nextStake.toLocaleString(), 'loss');
+    }
+
+    const targetVal = parseFloat(state.target);
+    if (targetVal > 0 && state.total_profit >= targetVal && !state.target_hit) {
+      state.target_hit = true;
+      showTargetOverlay();
+    }
+  }
+
+  saveState();
+  renderStatus();
+  renderSummary();
+  renderBetHistory();
+  clearBetForm();
+}
+
+
+
+function clearBetForm() {
+  document.getElementById('bet_id').value = '';
+  document.getElementById('prediction').value = '';
+  document.getElementById('odds').value = '';
+  document.getElementById('score_home').value = '';
+  document.getElementById('score_away').value = '';
+  // Reset all bet detail fields lock + confirm bar
+  document.getElementById('bet_id').disabled = false;
+  document.getElementById('bet_id').style.opacity = '1';
+  document.getElementById('odds').disabled = false;
+  document.getElementById('odds').style.opacity = '1';
+  document.getElementById('btn_ft').disabled = false;
+  document.getElementById('btn_ht').disabled = false;
+  document.getElementById('btn_ft').style.opacity = '1';
+  document.getElementById('btn_ht').style.opacity = '1';
+  document.getElementById('prediction').disabled = false;
+  document.getElementById('prediction').style.opacity = '1';
+  document.getElementById('cs_score').value = '';
+  document.getElementById('cs_picker_row').style.display = 'none';
+  document.getElementById('pred_confirm_bar').style.display = 'none';
+  // Re-lock score fields until next prediction is confirmed
+  lockScoreFields();
+}
+
+function flashBanner(msg, type) {
+  const el = document.getElementById('result_banner');
+  el.className = 'result-banner ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function showTargetOverlay() {
+  const _bv = parseFloat(state.bankroll) || 0;
+  const _fb = _bv ? ' Bankroll is now ' + (_bv + state.total_profit).toLocaleString() + '.' : '';
+  document.getElementById('overlay_sub').textContent =
+    'Profit of +' + state.total_profit.toLocaleString() + ' has hit your target of ' + parseFloat(state.target).toLocaleString() + '.' + _fb + ' Outstanding!';
+  document.getElementById('target_overlay').classList.add('show');
+}
+
+function closeOverlay() {
+  document.getElementById('target_overlay').classList.remove('show');
+}
+
+function confirmReset() {
+  if (confirm('Reset ALL data and start fresh? This cannot be undone.')) {
+    localStorage.removeItem(STORE_KEY);
+    state = {
+      bankroll: '', initial_stake: '', chances_per_session: '',
+      target: '', current_session: 1, current_chance: 1,
+      session_losses: 0, session_gross_wins: 0, sessions: [],
+      total_profit: 0, target_hit: false,
+      stop_loss: state.stop_loss || '',
+      stake_rounding: state.stake_rounding || 1,
+      last_lost_stake: 0, last_lost_odds: 0,
+      last_won_stake: 0, last_won_odds: 0,
+      mode: state.mode || 'default',
+      match_period: 'FT',
+      chance_outcomes: [],
+      bet_history: []
+    };
+    ['bankroll','initial_stake','target','stop_loss','bet_id','odds'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.value = ''; el.setAttribute('readonly',''); }
+    });
+    document.getElementById('chances_per_session').value = '';
+    clearBetForm();
+    renderStatus();
+    renderSummary();
+    renderBetHistory();
+    unlockMode();
+    document.getElementById('result_banner').style.display = 'none';
+    const _cn = document.getElementById('chart_target_notify');
+    if (_cn) _cn.style.display = 'none';
+    const _bma = document.getElementById('balance_mismatch_alert');
+    if (_bma) _bma.style.display = 'none';
+    const _sla = document.getElementById('stop_loss_alert');
+    if (_sla) _sla.style.display = 'none';
+    clearAllFieldErrors();
+    const _ns = document.getElementById('chart_next_stake');
+    if (_ns) _ns.textContent = '—';
+    const _bv = document.getElementById('chart_bankroll_val');
+    if (_bv) _bv.textContent = '—';
+    const _ar = document.getElementById('chart_arrow');
+    if (_ar) { _ar.textContent = '▲'; _ar.style.color = 'var(--accent)'; }
+  }
+}
+
+function populateInputs() {
+  if (state.bankroll) document.getElementById('bankroll').value = state.bankroll;
+  if (state.initial_stake) document.getElementById('initial_stake').value = state.initial_stake;
+  if (state.chances_per_session) document.getElementById('chances_per_session').value = state.chances_per_session;
+  if (state.target) document.getElementById('target').value = state.target;
+  if (state.stop_loss) document.getElementById('stop_loss').value = state.stop_loss;
+  if (state.stake_rounding) document.getElementById('stake_rounding').value = state.stake_rounding;
+}
+
+// Init
+loadState();
+populateInputs();
+renderStatus();
+renderSummary();
+renderBetHistory();
+
+// Dismiss keyboard on Enter for all inputs
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') {
+    e.preventDefault();
+    document.activeElement.blur();
+  }
+});
+</script>
+</body>
+</html>
