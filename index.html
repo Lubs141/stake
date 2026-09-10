@@ -599,13 +599,19 @@
   </div>
 
   <div class="section-head" style="border-top:1px solid var(--border)">⚽ Match Score — <span id="score_period_label" style="font-weight:400;font-size:11px;color:var(--muted-text);">Full Time</span></div>
+  <div style="display:flex;align-items:center;justify-content:flex-end;margin:4px 16px 6px;gap:6px;">
+    <span style="font-size:10px;color:var(--muted-text);font-weight:600;">Max Score</span>
+    <input type="text" id="max_score_select" inputmode="numeric" pattern="[0-9]*" placeholder="5" readonly
+      onfocus="this.removeAttribute('readonly')"
+      oninput="updateMaxScore(this.value)"
+      onblur="this.setAttribute('readonly','');this.blur()"
+      style="font-size:13px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);width:48px;text-align:center;">
+  </div>
   <div class="score-row">
     <div>
       <div class="score-label">Home</div>
       <select id="score_home" class="score-select" onchange="save()" disabled style="opacity:0.4;pointer-events:none;">
         <option value="">-</option>
-        <option>0</option><option>1</option><option>2</option>
-        <option>3</option><option>4</option><option>5</option>
       </select>
     </div>
     <div class="score-vs">VS</div>
@@ -613,8 +619,6 @@
       <div class="score-label">Away</div>
       <select id="score_away" class="score-select" onchange="save()" disabled style="opacity:0.4;pointer-events:none;">
         <option value="">-</option>
-        <option>0</option><option>1</option><option>2</option>
-        <option>3</option><option>4</option><option>5</option>
       </select>
     </div>
   </div>
@@ -672,6 +676,7 @@ let state = {
   target: '',
   stop_loss: '',
   stake_rounding: 1,
+  max_score: 5,
   current_session: 1,
   current_chance: 1,
   session_losses: 0,
@@ -1495,6 +1500,31 @@ function getPredictionResult(prediction, home, away) {
   }
 }
 
+function buildScoreOptions(maxVal, currentHome, currentAway) {
+  ['score_home', 'score_away'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = idx === 0 ? currentHome : currentAway;
+    sel.innerHTML = '<option value="">-</option>';
+    for (let i = 0; i <= maxVal; i++) {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = i;
+      if (String(i) === String(current)) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+function updateMaxScore(val) {
+  const max = parseInt(val);
+  if (!max || max < 1 || max > 99) return; // ignore invalid/empty input
+  state.max_score = max;
+  saveState();
+  const homeVal = document.getElementById('score_home').value;
+  const awayVal = document.getElementById('score_away').value;
+  buildScoreOptions(max, homeVal, awayVal);
+}
+
 function setMatchPeriod(period) {
   state.match_period = period;
   save();
@@ -1867,8 +1897,7 @@ function clearBetForm() {
   document.getElementById('bet_id').value = '';
   document.getElementById('prediction').value = '';
   document.getElementById('odds').value = '';
-  document.getElementById('score_home').value = '';
-  document.getElementById('score_away').value = '';
+  buildScoreOptions(state.max_score || 5, '', '');
   // Reset all bet detail fields lock + confirm bar
   document.getElementById('bet_id').disabled = false;
   document.getElementById('bet_id').style.opacity = '1';
@@ -1917,6 +1946,7 @@ function confirmReset() {
       total_profit: 0, target_hit: false,
       stop_loss: state.stop_loss || '',
       stake_rounding: state.stake_rounding || 1,
+      max_score: state.max_score || 5,
       last_lost_stake: 0, last_lost_odds: 0,
       last_won_stake: 0, last_won_odds: 0,
       mode: state.mode || 'default',
@@ -1957,11 +1987,15 @@ function populateInputs() {
   if (state.chances_per_session) document.getElementById('chances_per_session').value = state.chances_per_session;
   if (state.target) document.getElementById('target').value = state.target;
   if (state.stop_loss) document.getElementById('stop_loss').value = state.stop_loss;
+  const _ms = state.max_score || 5;
+  const _msSel = document.getElementById('max_score_select'); if (_msSel) _msSel.value = _ms;
+  buildScoreOptions(_ms, '', '');
   if (state.stake_rounding) document.getElementById('stake_rounding').value = state.stake_rounding;
 }
 
 // Init
 loadState();
+buildScoreOptions(state.max_score || 5, '', '');
 populateInputs();
 renderStatus();
 renderSummary();
