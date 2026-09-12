@@ -434,6 +434,20 @@
     </select>
   </div>
   <div class="row">
+    <span class="row-label">Win Limit <span style="font-size:9px;color:var(--muted-text);font-weight:400;">(per session)</span></span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <button id="btn_win_limit_off" onclick="setWinLimit(false)" style="width:44px;padding:4px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#000;transition:all 0.15s;text-align:center;">OFF</button>
+        <button id="btn_win_limit_on" onclick="setWinLimit(true)" style="width:44px;padding:4px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--muted-text);transition:all 0.15s;text-align:center;">ON</button>
+      </div>
+      <input type="text" id="win_limit_val" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 2" readonly
+        onfocus="this.removeAttribute('readonly')"
+        oninput="saveAndUpdate()"
+        onblur="this.setAttribute('readonly','');this.blur()"
+        style="width:60px;font-size:13px;font-weight:700;text-align:center;display:none;">
+    </div>
+  </div>
+  <div class="row">
     <span class="row-label">Stake Rounding</span>
     <select id="stake_rounding" onchange="saveAndUpdate()" style="font-size:12px;">
       <option value="1">Exact — e.g. 23,747</option>
@@ -677,6 +691,9 @@ let state = {
   stop_loss: '',
   stake_rounding: 1,
   max_score: 5,
+  win_limit_enabled: false,
+  win_limit: 0,
+  session_wins: 0,
   current_session: 1,
   current_chance: 1,
   session_losses: 0,
@@ -850,11 +867,11 @@ function saveAndUpdate() {
   state.chances_per_session = document.getElementById('chances_per_session').value;
   state.target = document.getElementById('target').value;
   state.stop_loss = document.getElementById('stop_loss').value;
+  state.win_limit = parseInt(document.getElementById('win_limit_val').value) || 0;
   state.stake_rounding = parseInt(document.getElementById('stake_rounding').value) || 1;
   saveState();
   renderStatus();
   checkBalanceMismatch();
-  checkStopLoss();
   checkStopLoss();
 }
 
@@ -1376,6 +1393,12 @@ function renderStatus() {
 
   document.getElementById('display_session').textContent = sess;
   document.getElementById('bet_count_badge').textContent = state.bet_history.length;
+  // Sync win limit UI
+  if (typeof setWinLimit === 'function') {
+    setWinLimit(state.win_limit_enabled || false);
+    const _wlv = document.getElementById('win_limit_val');
+    if (_wlv && state.win_limit) _wlv.value = state.win_limit;
+  }
   checkBalanceMismatch();
   if (state.bet_history.length > 0) lockMode(); else unlockMode();
   if (chartVisible) startChartAnimation();
@@ -1498,6 +1521,19 @@ function getPredictionResult(prediction, home, away) {
       }
       return false;
   }
+}
+
+function setWinLimit(enabled) {
+  state.win_limit_enabled = enabled;
+  saveState();
+  const inp = document.getElementById('win_limit_val');
+  const btnOff = document.getElementById('btn_win_limit_off');
+  const btnOn  = document.getElementById('btn_win_limit_on');
+  btnOff.style.background = !enabled ? 'var(--accent)' : 'transparent';
+  btnOff.style.color      = !enabled ? '#000' : 'var(--muted-text)';
+  btnOn.style.background  = enabled  ? 'var(--accent)' : 'transparent';
+  btnOn.style.color       = enabled  ? '#000' : 'var(--muted-text)';
+  inp.style.display = enabled ? 'block' : 'none';
 }
 
 function buildScoreOptions(maxVal, currentHome, currentAway) {
@@ -1736,6 +1772,8 @@ function submitBet() {
 
   const won = getPredictionResult(pred, home, away);
   const isLastChance = state.current_chance >= maxCh;
+  const winLimitHit = won && state.win_limit_enabled && state.win_limit > 0
+    && state.session_wins >= state.win_limit;
 
   // Record into bet history
   state.bet_history.push({
@@ -1771,11 +1809,13 @@ function submitBet() {
       state.last_lost_stake = 0;
       state.last_lost_odds = 0;
     }
+    // Track wins in session
+    state.session_wins = (state.session_wins || 0) + 1;
 
     const targetVal = parseFloat(state.target);
     const targetHitNow = targetVal > 0 && state.total_profit >= targetVal && !state.target_hit;
 
-    if (isLastChance || targetHitNow) {
+    if (isLastChance || targetHitNow || winLimitHit) {
       // Close session: all chances used, or target hit
       const sessionNet = state.session_gross_wins - state.session_losses;
       state.sessions.push({
@@ -1789,6 +1829,7 @@ function submitBet() {
       state.current_chance = 1;
       state.session_losses = 0;
       state.session_gross_wins = 0;
+      state.session_wins = 0;
       state.chance_outcomes = [];
       // MTG: if last chance won but there was a prior loss this session, carry it
       if (state.mode === 'default' && _prevLostStake && _prevLostOdds) {
@@ -1798,8 +1839,9 @@ function submitBet() {
         state.last_lost_stake = 0; state.last_lost_odds = 0;
       }
       state.last_won_stake = 0; state.last_won_odds = 0;
+      state.session_wins = 0;
 
-      const closeReason = targetHitNow ? ' Target reached!' : ' Session complete!';
+      const closeReason = targetHitNow ? ' Target reached!' : winLimitHit ? ' Win limit reached!' : ' Session complete!';
       const nextCh1Stake = calcStake(init, 1, state.last_lost_stake, state.last_lost_odds, state.last_won_stake, state.last_won_odds);
       const winCloseNote = (state.mode === 'default' && state.last_lost_stake)
         ? ' Last chance loss carried — next session opens at: ' + nextCh1Stake.toLocaleString() + '.'
@@ -1845,6 +1887,7 @@ function submitBet() {
       state.current_chance = 1;
       state.session_losses = 0;
       state.session_gross_wins = 0;
+      state.session_wins = 0;
       state.chance_outcomes = [];
       // If session net is negative, keep last_lost_stake & last_lost_odds so
       // chance 1 of the next session recovers the overall session loss.
@@ -1947,6 +1990,9 @@ function confirmReset() {
       stop_loss: state.stop_loss || '',
       stake_rounding: state.stake_rounding || 1,
       max_score: state.max_score || 5,
+      win_limit_enabled: state.win_limit_enabled || false,
+      win_limit: state.win_limit || 0,
+      session_wins: 0,
       last_lost_stake: 0, last_lost_odds: 0,
       last_won_stake: 0, last_won_odds: 0,
       mode: state.mode || 'default',
@@ -1989,6 +2035,8 @@ function populateInputs() {
   if (state.stop_loss) document.getElementById('stop_loss').value = state.stop_loss;
   const _ms = state.max_score || 5;
   const _msSel = document.getElementById('max_score_select'); if (_msSel) _msSel.value = _ms;
+  setWinLimit(state.win_limit_enabled || false);
+  if (state.win_limit) document.getElementById('win_limit_val').value = state.win_limit;
   buildScoreOptions(_ms, '', '');
   if (state.stake_rounding) document.getElementById('stake_rounding').value = state.stake_rounding;
 }
