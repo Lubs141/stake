@@ -1772,9 +1772,6 @@ function submitBet() {
 
   const won = getPredictionResult(pred, home, away);
   const isLastChance = state.current_chance >= maxCh;
-  const winLimitHit = won && state.win_limit_enabled && state.win_limit > 0
-    && state.session_wins >= state.win_limit;
-
   // Record into bet history
   state.bet_history.push({
     bet_id: parseInt(betIdVal),
@@ -1811,6 +1808,9 @@ function submitBet() {
     }
     // Track wins in session
     state.session_wins = (state.session_wins || 0) + 1;
+    // Evaluate win limit AFTER incrementing session_wins
+    const winLimitHit = state.win_limit_enabled && state.win_limit > 0
+      && state.session_wins >= state.win_limit;
 
     const targetVal = parseFloat(state.target);
     const targetHitNow = targetVal > 0 && state.total_profit >= targetVal && !state.target_hit;
